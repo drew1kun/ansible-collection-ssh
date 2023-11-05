@@ -1,0 +1,35 @@
+namespace: drew1kun
+name: ssh
+version: 1.0.0
+readme: README.md
+authors:
+- Andrew Shagayev <drew-kun@protonmail.com>
+description: Ansible collection for configuring SSH authentication with Ceritifcate Chain of Trust
+
+# The path to the license file for the collection. This path is relative to the root of the collection. This key is
+# mutually exclusive with 'license'
+license_file: 'LICENSE'
+tags:
+- shell
+- ssh
+- openssh
+- keys
+- certificates
+- chain_of_trust
+- macos
+- mac
+- linux
+- debian
+- freebsd
+
+#dependencies:
+#  community.general: ">=3.0.0"
+
+repository: https://github.com/drew1kun/ansible-collection-ssh.git
+documentation: https://github.com/drew1kun/ansible-collection-ssh/blob/main/README.md
+homepage: https://github.com/drew1kun/ansible-collection-ssh
+issues: https://github.com/drew1kun/ansible-collection-ssh/issues
+
+build_ignore:
+- '*.tar.gz'
+- 'signatures'

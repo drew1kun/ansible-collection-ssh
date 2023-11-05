@@ -1,0 +1,38 @@
+---
+- name: "[main.yml] Include {{ ansible_system }}-specific variables"
+  ansible.builtin.include_vars: "{{ ansible_system|lower }}.yml"
+  tags:
+    - ssh_userCA
+    - ssh_userCA_local
+    - ssh_userCA_remote
+    - ssh_userCA_revoke
+
+- name: "[main.yml] Import local tasks"
+  ansible.builtin.import_tasks: local.yml
+  delegate_to: localhost
+  run_once: true
+  tags:
+    - ssh_userCA
+    - ssh_userCA_local
+
+- name: "[main.yml] Import remote tasks"
+  ansible.builtin.import_tasks: remote.yml
+  tags:
+    - ssh_userCA
+    - ssh_userCA_remote
+
+- name: "[main.yml] Import tasks: revoke"
+  ansible.builtin.import_tasks: revoke.yml
+  when:
+    - ssh_userCA_revoked
+    - ssh_userCA_revoked|length
+  tags:
+    - ssh_userCA
+    - ssh_userCA_revoke
+
+- name: "[main.yml] Flush handlers"
+  ansible.builtin.meta: flush_handlers
+  tags:
+    - ssh_userCA
+    - ssh_userCA_remote
+    - ssh_userCA_revoke

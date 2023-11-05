@@ -1,0 +1,19 @@
+galaxy_info:
+  author: Andrew Shagayev
+  description: Cross-platform ansible role for generating user SSH keys.
+  license: MIT
+  min_ansible_version: 1.2
+  github_branch: master
+  platforms:
+    - name: Debian
+      versions:
+        - all
+    - name: MacOSX
+      versions:
+        - 10.12
+        - 10.13
+  galaxy_tags:
+    - ssh
+    - sshd
+    - secure_shell
+dependencies: []

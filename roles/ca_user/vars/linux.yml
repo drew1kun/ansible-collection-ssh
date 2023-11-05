@@ -1,0 +1,6 @@
+---
+ssh_userCA_svc_name: "{{ 'ssh' if 'Debian' in ansible_os_family else 'sshd' }}"
+ssh_userCA_etc_dir: /etc/ssh
+ssh_userCA_daemon_config: /etc/ssh/sshd_config
+ssh_userCA_owner: root
+ssh_userCA_group: root

@@ -1,0 +1,39 @@
+---
+ssh_hostCA_reissue_keys:  false   # Will recreate Host Keys and Certs even if they already exist
+ssh_hostCA_reissue_certs: false   # Will recreate only Host Certs
+
+# The ~/.ssh/known_hosts string to make local SSH client accept all host keys signed by CA:
+ssh_hostCA_knownhosts:
+  - "@cert-authority *.domain.com,*.domain.org {{ lookup('file', ssh_hostCA_path+'.pub') }}"
+
+# Remove (temporarily) Passphrase (for old ansible versions and/or for convenience):
+#   ssh-keygen -p -N "" -f ./id_ed25519-HostCA
+# Readd the Passphrase:
+#   ssh-keygen -p -f ./id_ed25519-HostCA
+#
+# The support of passwphrase-protected CA will be added once the following feature is implemented:
+#   https://github.com/ansible-collections/community.crypto/issues/195
+ssh_hostCA:
+  #Temporary path to ssh Host CA keypair. Host CA will be generated if it does not exist:
+  # NOTE: When changing the type of the key, the size MUST be set correspondingly!
+  path: "/tmp/id_ed25519-HostCA"  # required
+  type: ed25519
+  size: 256
+  comment: domain.com
+  #passphrase: 'use vault'
+
+# Host Keys parameters
+# Generated in the default host keys location depending on managed system (see vars dir):
+ssh_hostCA_key:
+  type: ed25519
+  size: 256
+  comment: "{{ inventory_hostname }} in domain.com"
+
+# inventory {{ ansible_host }} var must be FQDN e.g.: srv.domain.lan
+# Otherwise specify it per host in host_vars:
+ssh_hostCA_cert:
+  id: "{{ inventory_hostname }}"
+  valid_from: always
+  valid_to: forever
+  # The domain used for SSH via TLS access) must go first:
+  principals: "host1-tls.domain.com,host1-alias.domain.com"

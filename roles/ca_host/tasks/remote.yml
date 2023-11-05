@@ -1,0 +1,101 @@
+---
+- name: "[remote.yml] REMOTE: Generate Host Keypair"
+  community.crypto.openssh_keypair:
+    path:           "{{ ssh_hostCA_etc_dir }}/ssh_host_{{ ssh_hostCA_key.type|default('rsa')|string }}_key"
+    type:           "{{ ssh_hostCA_key.type|default(omit) }}"
+    size:           "{{ ssh_hostCA_key.size|default(None)|int or omit }}"
+    comment:        "{{ ssh_hostCA_key.comment|default(omit) }}"
+    passphrase:     "{{ ssh_hostCA_key.passphrase|default(omit) }}"
+    regenerate:     "{{ 'always' if ssh_hostCA_reissue_keys else 'full_idempotence' }}"
+    backend: auto
+  notify: Reload sshd
+  register: ssh_hostCA_key_issued
+  become: true
+
+- name: "[remote.yml] REMOTE: ALWAYS check if the Cert file already exists"
+  ansible.builtin.stat:
+    path: "{{ ssh_hostCA_etc_dir }}/ssh_host_{{ ssh_hostCA_key.type|default('ed25519') }}_key-cert.pub"
+  register: ssh_hostCA_old_cert
+
+- name: "[remote.yml] REMOTE: Retrieve Host Certificate Serial Number"
+  ansible.builtin.shell: >
+    ssh-keygen -L \
+      -f {{ ssh_hostCA_etc_dir }}/ssh_host_{{ ssh_hostCA_key.type|default('ed25519') }}_key-cert.pub \
+      | grep 'Serial: ' | xargs | cut -d ' ' -f2
+  become: true
+  when: ssh_hostCA_old_cert.stat.exists
+  register: ssh_hostCA_old_cert_sn
+  changed_when: false
+
+- name: "[remote.yml] REMOTE: Temporarily copy HostCA to Managed Host"
+  ansible.builtin.copy:
+    src: "{{ ssh_hostCA.path }}"
+    dest: "{{ ssh_hostCA_etc_dir }}"
+    owner: "{{ ssh_hostCA_owner }}"
+    group: "{{ ssh_hostCA_group }}"
+    mode: '0600'
+    backup: false
+  become: true
+  changed_when: false
+  when: >
+   ssh_hostCA_key_issued.changed
+   or ssh_hostCA_reissue_certs
+   or not ssh_hostCA_old_cert.stat.exists
+
+# The CA Key has to have no passphrase
+- name: "[remote.yml] REMOTE: Issue Host Certificate"
+  community.crypto.openssh_cert:
+    type:           host
+    valid_from:     "{{ ssh_hostCA_cert.expiry|default('always')|string }}"
+    valid_to:       "{{ ssh_hostCA_cert.expiry|default('forever')|string }}"
+    signing_key:    "{{ ssh_hostCA_etc_dir|string }}/{{ ssh_hostCA.path.split('/')[-1] }}"
+    public_key:     "{{ ssh_hostCA_etc_dir|string }}/ssh_host_{{ ssh_hostCA_key.type|default('ed25519')|string }}_key.pub"
+    path:           "{{ ssh_hostCA_etc_dir|string }}/ssh_host_{{ ssh_hostCA_key.type|default('ed25519')|string }}_key-cert.pub"
+    serial_number:  "{{
+                        1 if ssh_hostCA_key_issued.changed
+                        else (ssh_hostCA_old_cert_sn.stdout|default(0)|int+1)
+                     }}"
+    principals:     "{{ ssh_hostCA_cert.principals.split(',')|list }}"
+    identifier:     "{{ ssh_hostCA_cert.id|default(inventory_hostname)|string }}"  # cert won't be reissued even if id is new
+    regenerate:     "{{
+                        'always' if ssh_hostCA_reissue_keys or ssh_hostCA_reissue_certs
+                        else 'never'
+                     }}"
+  register: ssh_hostCA_cert_issued
+  #notify: Reload sshd
+  become: true
+  when: >
+   ssh_hostCA_key_issued.changed
+   or ssh_hostCA_reissue_certs
+   or not ssh_hostCA_old_cert.stat.exists
+
+- name: "[remote.yml] REMOTE: Remove HostCA from Managed Host after using it"
+  ansible.builtin.file:
+    path: "{{ ssh_hostCA_etc_dir|string }}/{{ ssh_hostCA.path.split('/')[-1] }}"
+    state: absent
+  become: true
+  changed_when: false
+  when: >
+   ssh_hostCA_key_issued.changed
+   or ssh_hostCA_reissue_certs
+   or not ssh_hostCA_old_cert.stat.exists
+
+# My recepie here:
+# lineinfile:
+#   regexp: '^([\s]*[#]*)*LINE_PART_1[\s]*LINE_PART_2[\s]*(.*)$
+#   line: "LINE_PART_1  LINE_PART_2"
+#   insertafter: "^([\s]*[#]*)*AFTER_PATTERN[\s]*(.*)$"
+- name: "[remote.yml] REMOTE: Make sure sshd uses the new Host Key and Certificate"
+  ansible.builtin.lineinfile:
+    path: "{{ ssh_hostCA_config }}"
+    regexp: "{{ item.regexp }}"
+    line: "{{ item.line }}"
+    insertafter: '^([\s]*[#]*)*HostKey[\s]*(.*)$'
+    firstmatch: false
+  loop:
+    - regexp: ^([\s]*[#]*)*HostKey(\s)*{{ ssh_hostCA_etc_dir }}/ssh_host_{{ ssh_hostCA_key.type|default('ed25519') }}_key[\s]*(.*)$
+      line: "HostKey {{ ssh_hostCA_etc_dir }}/ssh_host_{{ ssh_hostCA_key.type|default('ed25519') }}_key"
+    - regexp: ^([\s]*[#]*)*HostCertificate(\s)*{{ ssh_hostCA_etc_dir }}/ssh_host_{{ ssh_hostCA_key.type|default('ed25519') }}_key-cert.pub[\s]*(.*)$
+      line: "HostCertificate {{ ssh_hostCA_etc_dir }}/ssh_host_{{ ssh_hostCA_key.type|default('ed25519') }}_key-cert.pub"
+  become: true
+  notify: Reload sshd
