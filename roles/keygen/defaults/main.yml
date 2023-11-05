@@ -1,0 +1,19 @@
+---
+# defaults file for keygen
+
+# If true, keys will be reissued even if they already exist.
+ssh_keygen_reissue: false
+
+# The support of passwphrase-protected CA will be added once the following feature is implemented:
+#   https://github.com/ansible-collections/community.crypto/issues/195
+ssh_keygen_keys:
+  - path: /tmp/user_keys/id_ed25519-user1@domain-com
+    type: ed25519   # ed25519 | rsa | rsa1 | dsa | ecdsa
+    size: 256       # rsa:1024|2048|4096; dsa:1024; ecdsa:256|384|521; ed25519:256(ignored)
+    comment: user1@domain.com
+    #passphrase: 'use_vault'
+  - path: /tmp/user_keys/id_rsa-user2@domain-com
+    type: rsa
+    size: 4096
+    comment: user2@domain.com
+    #passphrase: 'use_vault'

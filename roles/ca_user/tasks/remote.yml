@@ -1,0 +1,73 @@
+---
+# REMOTE SSH SERVER TASKS
+
+- name: "[remote.yml] REMOTE: Ensure UserCA Public Key exists on Managed Host"
+  ansible.builtin.copy:
+    src: "{{ ssh_userCA.path }}.pub"
+    dest: "{{ ssh_userCA_etc_dir }}"
+    owner: "{{ ssh_userCA_owner }}"
+    group: "{{ ssh_userCA_group }}"
+    mode: '0600'
+    backup: false
+  become: true
+  notify: Reload sshd
+
+# Without this file the sshd will reject the valid keys, so keping it here
+- name: "[remote.yml] REMOTE: Ensure RevokedKeys file exists on Managed Host"
+  ansible.builtin.copy:
+    dest: "{{ ssh_userCA_etc_dir }}/{{ ssh_userCA_krl_filename }}"
+    content: ""
+    force: false
+    owner: "{{ ssh_userCA_owner }}"
+    group: "{{ ssh_userCA_group }}"
+    mode: '0644'
+  become: true
+  notify: Reload sshd
+
+- name: "[remote.yml] REMOTE: Ensure AuthorizedPrincipals dir exists on Managed Host"
+  ansible.builtin.file:
+    path: "{{ ssh_userCA_etc_dir }}/{{ ssh_userCA_principals_dir_name }}"
+    state: directory
+    mode: '0755'
+    owner: "{{ ssh_userCA_owner }}"
+    group: "{{ ssh_userCA_group }}"
+  become: true
+  notify: Reload sshd
+
+- name: "[remote.yml] REMOTE: Ensure AuthorizedPrincipals files exist"
+  ansible.builtin.copy:
+    dest: "{{ ssh_userCA_etc_dir }}/{{ ssh_userCA_principals_dir_name }}/{{ item.user }}"
+    content: "{{ item.user if item.user != 'root' else '' }}"
+    force: no
+    mode: '0755'
+    owner: "{{ ssh_userCA_owner }}"
+    group: "{{ ssh_userCA_group }}"
+  loop: "{{ ssh_userCA_cert.principals + [ { 'user': 'root' } ] }}"
+  become: true
+  notify: Reload sshd
+
+# My recepie here:
+# lineinfile:
+#   regexp: '^([\s]*[#]*)*LINE_PART_1[\s]*LINE_PART_2[\s]*(.*)$
+#   line: "LINE_PART_1  LINE_PART_2"
+#   insertafter: "^([\s]*[#]*)*AFTER_PATTERN[\s]*(.*)$"
+- name: "[remote.yml] REMOTE: Make sure sshd knows about UserCA"
+  ansible.builtin.lineinfile:
+    path: "{{ ssh_userCA_daemon_config }}"
+    regexp: "{{ item.regexp }}"
+    line: "{{ item.line }}"
+    insertafter: "{{ item.after }}"
+    firstmatch: false
+  loop:
+    - regexp: '^([\s]*[#]*)*AuthorizedPrincipalsFile[\s]*/etc/ssh/{{ ssh_userCA_principals_dir_name }}/%u[\s]*(.*)$'
+      line: "AuthorizedPrincipalsFile /etc/ssh/{{ ssh_userCA_principals_dir_name }}/%u"
+      after: '^([\s]*[#]*)*AuthorizedKeysFile[\s]*(.*)$'
+    - regexp: '^([\s]*[#]*)*TrustedUserCAKeys[\s]*{{ ssh_userCA_etc_dir }}/{{ ssh_userCA.path|basename }}.pub[\s]*(.*)$'
+      line: "TrustedUserCAKeys {{ ssh_userCA_etc_dir }}/{{ ssh_userCA.path|basename }}.pub"
+      after: '^([\s]*[#]*)*AuthorizedPrincipalsFile[\s]*(.*)$'
+    - regexp: '^([\s]*[#]*)*RevokedKeys[\s]*(.*)$'
+      line: "RevokedKeys {{ ssh_userCA_etc_dir }}/{{ ssh_userCA_krl_filename }}"
+      after: '^([\s]*[#]*)*TrustedUserCAKeys[\s]*(.*)$'
+  become: true
+  no_log: true
+  notify: Reload sshd
