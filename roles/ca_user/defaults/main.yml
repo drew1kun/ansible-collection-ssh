@@ -1,0 +1,79 @@
+---
+# NOTE:
+# Run playbook:
+#   ansible-playbook ssh_playbook.yml --extra-vars "target=<host_or_group>"  --flush-cache
+
+# To only Issue Certs locally using existing CA (or generate the CA if it does not exist), add:
+#   --tags ssh_userCA_local
+
+# To only reconfigure remote SSHD to recognize your UserCA, add:
+#   --tags ssh_userCA_remote
+
+# Revoke the specified Certificates only:
+#   --tags ssh_userCA_revoke
+
+
+# ======== USER CERTIFICATE AUTHORITY PARAMETERS - START =====
+# NOTE: If specifying existing CA, for now it must be unencrypted (no passphrase)
+# Remove temporarily passphrase from UserCA:
+#   ssh-keygen -p -N "" -f ./id_ed25519-UserCA
+# Add the Passphrase back (after use):
+#   ssh-keygen -p -f ./id_ed25519-UserCA
+#
+# If the CA exists, only ssh_userCA.path is required, other parameters will be ignored,
+#   see regenerate: never for community.crypto.openssh_keypair module
+#
+# The support of passwphrase-protected CA will be added once the following feature is implemented:
+#   https://github.com/ansible-collections/community.crypto/issues/195
+ssh_userCA:
+  # Temporary path to sshd UserCA keypair. UserCA will be generated if it does not exist there.
+  # NOTE: When changing the type of the key, the size MUST be set correspondingly!
+  path: /tmp/id_ed25519-UserCA
+  type: ed25519   # ed25519 | rsa | rsa1 | dsa | ecdsa
+  size: 256       # rsa:1024|2048|4096; dsa:1024; ecdsa:256|384|521; ed25519:256(ignored)
+  comment: User CA for hosts domain.com
+  #passphrase: 'use ansible-vault'
+# ======== USER CERTIFICATE AUTHORITY PARAMETERS - END =======
+
+# ======== USER KEYS THAT MUST BE SIGNED BY CA - START =======
+# Naming Convention: Keys must be named in the following format
+#   id_{{ type }}-{{ userN }}-<anything_else>.pub
+# e.g:
+#   - id_ed25519-user1-domain-com.pub
+#   - id_rsa-user2.pub
+#
+# Existing dir that contains the user keypairs.
+# If you have no keys, please check the drew1kun.ssh.keys role
+ssh_userCA_keys_path: /tmp/user_keys   Will be created if doesn't exist.
+# ======== USER KEYS THAT MUST BE SIGNED BY CA - END =========
+
+# =========== ISSUED CERTS PARAMETERS - START ===============
+# If True, will only sign user keys, but will not configure remote SSHD servers:
+ssh_userCA_principals_dir_name: authorozed_principals
+ssh_userCA_cert:
+  valid_to: forever  # NOTE: for idempotency use 'forever' or set to +520w for 10 years etc..
+  principals:
+    # username must be a part of the key name e.g.:
+    #   id_ed25519-<username>-<whatever>
+    - user: user1   # Added to Auth Principles to allow Cert to login as user specified in "limit"
+      id: user1@domain.com  # cosmetic: cert won't be reissued even if id changed; no role in KRL either
+      sn: 1         # Used in KRL - Increment SN each time you issue new certificate for the same key
+      principal: user1,root,admin,pi
+# =========== ISSUED CERTS PARAMETERS - END =================
+
+# ============ REVOKED KEYS PARAMETERS - START ===============
+# You can revoke either the key or the certificate, and issue new one for the same key
+#
+# Before revoking the certificate get it's Serial Number with:
+#   ssh-keygen -L -f id_ed25519-cert.pub
+ssh_userCA_krl_filename: revoked_keys_and_certs  # Key Revokation List filename
+ssh_userCA_revoked: []
+# E.g:
+# ssh_userCA_revokeds:
+# - filename: id_rsa-user1-sn1-cert.pub   # REQUIRED: filename_sn-cert.pub
+#   content: <cert_or_public_key_1>       # REQUIRED: The content of -cert.pub to be revoked
+#   sn: <serial_number1>                  # REQUIRED: SN from the -L command above
+# - filename: id_rsa-user2-sn2-cert.pub
+#   content: <cert_or_public_key_2>
+#   sn: <serial_number_2>
+# ============ REVOKED KEYS PARAMETERS - END ================

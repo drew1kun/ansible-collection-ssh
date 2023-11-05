@@ -1,0 +1,5 @@
+---
+ssh_userCA_etc_dir: /etc/ssh
+ssh_userCA_daemon_config: /etc/sshd_extra
+ssh_userCA_owner: root
+ssh_userCA_group: wheel

@@ -1,0 +1,37 @@
+---
+- name: "[revoke.yml] REMOTE: Ensure revoked dir exists on Managed Host"
+  ansible.builtin.file:
+    path: "{{ ssh_userCA_etc_dir }}/revoked"
+    state: directory
+    mode: '0755'
+    owner: "{{ ssh_userCA_owner }}"
+    group: "{{ ssh_userCA_group }}"
+  become: true
+  notify: Reload sshd
+
+- name: "[revoke.yml] REMOTE: Ensure revoked keys/certs exist on Managed Host"
+  ansible.builtin.copy:
+    dest: "{{ ssh_userCA_etc_dir }}/revoked/{{ ssh_userCA_revoked_entity.filename }}"
+    content: "{{ ssh_userCA_revoked_entity.content }}"
+    owner: "{{ ssh_userCA_owner }}"
+    group: "{{ ssh_userCA_group }}"
+    mode: '0644'
+  become: true
+  notify: Reload sshd
+  register: ssh_userCA_entity_copy
+  loop: "{{ ssh_userCA_revoked|flatten(1) }}"
+  loop_control:
+    loop_var: ssh_userCA_revoked_entity
+
+- name: "[revoke.yml] REMOTE: Revoke the keys/certs"
+  ansible.builtin.command: >
+    ssh-keygen -k -f {{ ssh_userCA_etc_dir }}/{{ ssh_userCA_krl_filename }} \
+      -s {{ ssh_userCA_etc_dir }}/{{ ssh_userCA.path.split('/')[-1] }}.pub \
+      -z {{ ssh_userCA_revoked_entity.sn|string }} \
+      {{ ssh_userCA_etc_dir }}/revoked/{{ ssh_userCA_revoked_entity.filename }}
+  become: true
+  notify: Reload sshd
+  loop: "{{ ssh_userCA_revoked|flatten(1) }}"
+  loop_control:
+    loop_var: ssh_userCA_revoked_entity
+  changed_when: ssh_userCA_entity_copy.changed

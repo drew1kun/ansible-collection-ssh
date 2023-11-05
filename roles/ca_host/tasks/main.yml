@@ -1,0 +1,27 @@
+---
+- name: "[main.yml] Include {{ ansible_system }}-specific variables"
+  ansible.builtin.include_vars: "{{ ansible_system|lower }}.yml"
+  tags:
+    - ssh_hostCA_local
+    - ssh_hostCA_remote
+
+- name: "[main.yml] Import local tasks"
+  ansible.builtin.import_tasks: local.yml
+  delegate_to: localhost
+  tags:
+    - ssh_hostCA_local
+
+- name: "[main.yml] Import remote tasks"
+  ansible.builtin.import_tasks: remote.yml
+  tags:
+    - ssh_hostCA_remote
+
+- name: "[info.yml] Import remote reporting tasks"
+  ansible.builtin.import_tasks: info.yml
+  tags:
+    - ssh_hostCA_remote
+
+- name: "[main.yml] Flush handlers"
+  ansible.builtin.meta: flush_handlers
+  tags:
+    - ssh_hostCA_remote

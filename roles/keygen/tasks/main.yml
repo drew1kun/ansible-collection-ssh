@@ -1,0 +1,35 @@
+---
+# tasks file for keygen
+
+- name: "[main.yml] Create list of paths for keys to be generated"
+  ansible.builtin.set_fact:
+    ssh_keygen_paths: >-
+      {{
+        ssh_keygen_paths|default([])
+        + [item.path.split('/')[:-1]|join('/')]
+      }}
+  no_log: true
+  loop: "{{ ssh_keygen_keys|flatten(1) }}"
+  tags: ['ssh_keygen']
+
+- name: "[main.yml] Ensure the keys path dirs exist on Managed Host"
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+  loop: "{{ ssh_keygen_paths|unique }}"
+  tags: ['ssh_keygen']
+
+- name: "[main.yml] Generate User Keypair"
+  community.crypto.openssh_keypair:
+    path:           "{{ item.path|string }}"
+    type:           "{{ item.type|default(None)|string or omit }}"
+    size:           "{{ item.size|default(None)|int or omit }}"
+    comment:        "{{ item.comment|default(None)|string or omit }}"
+    passphrase:     "{{ item.passphrase|default(None)|string or omit }}"
+    # NOTE: don't regenerate key if it exists but does not conform with set options:
+    regenerate:     "{{ 'always' if ssh_keygen_reissue else 'full_idempotence' }}"
+    backend: auto
+  register: ssh_keygen_issued
+  loop: "{{ ssh_keygen_keys|flatten(1) }}"
+  tags: ['ssh_keygen']
