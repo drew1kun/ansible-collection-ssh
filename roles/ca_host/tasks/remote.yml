@@ -87,7 +87,7 @@
 #   insertafter: "^([\s]*[#]*)*AFTER_PATTERN[\s]*(.*)$"
 - name: "[remote.yml] REMOTE: Make sure sshd uses the new Host Key and Certificate"
   ansible.builtin.lineinfile:
-    path: "{{ ssh_hostCA_config }}"
+    path: "{{ ssh_hostCA_daemon_config }}"
     regexp: "{{ item.regexp }}"
     line: "{{ item.line }}"
     insertafter: '^([\s]*[#]*)*HostKey[\s]*(.*)$'

@@ -7,12 +7,6 @@
   become: true
   when: "'Linux' in ansible_system"
 
-- name: 'Reload sshd on FreeBSD'
-  ansible.builtin.command: /etc/sshd
-  listen: Reload sshd
-  become: true
-  when: "'FreeBSD' in ansible_system"
-
 - name: 'Reload sshd on MacOS'
   community.general.launchd:
     name:  ssh
@@ -20,3 +14,25 @@
   listen: Reload sshd
   become: true
   when: "'Darwin' in ansible_system"
+
+- name: 'Reload sshd on pfSense'
+  ansible.builtin.command: /etc/sshd
+  listen: Reload sshd
+  become: true
+  when: >-
+    'FreeBSD' in ansible_system and
+    (ssh_userCA_pfsense.results
+    | selectattr('stat.exists', 'eq', true)
+    | list | length) == 2
+
+- name: 'Reload sshd on FreeBSD'
+  ansible.builtin.service:
+    name:  sshd
+    state: reloaded
+  listen: Reload sshd
+  become: true
+  when: >-
+    'FreeBSD' in ansible_system and not
+    (ssh_userCA_pfsense.results
+    | selectattr('stat.exists', 'eq', true)
+    | list | length) == 2
