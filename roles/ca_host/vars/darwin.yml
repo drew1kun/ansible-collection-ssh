@@ -1,5 +1,5 @@
 ---
 ssh_hostCA_etc_dir: /etc/ssh
-ssh_hostCA_config: /etc/ssh/sshd_config
+ssh_hostCA_daemon_config: /etc/ssh/sshd_config
 ssh_hostCA_owner: root
 ssh_hostCA_group: wheel

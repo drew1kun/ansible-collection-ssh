@@ -1,4 +1,14 @@
 ---
+- name: '[main.yml] If System is FreeBSD determine whether it is pfSense or not'
+  stat:
+    path: "{{ item }}"
+  listen: Reload sshd
+  loop:
+    - /conf/config.xml
+    - /etc/inc/system.inc
+  register: ssh_userCA_pfsense
+  when: "'FreeBSD' in ansible_system"
+
 - name: "[main.yml] Include {{ ansible_system }}-specific variables"
   ansible.builtin.include_vars: "{{ ansible_system|lower }}.yml"
   tags:

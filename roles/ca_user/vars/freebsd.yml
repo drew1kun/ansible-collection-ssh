@@ -1,5 +1,10 @@
 ---
 ssh_userCA_etc_dir: /etc/ssh
-ssh_userCA_daemon_config: /etc/sshd_extra
+ssh_userCA_daemon_config: >-
+  '/etc/sshd_extra' if
+  (ssh_userCA_pfsense.results
+  | selectattr('stat.exists', 'eq', true)
+  | list | length) == 2 else
+  '/etc/ssh/sshd_config'
 ssh_userCA_owner: root
 ssh_userCA_group: wheel
