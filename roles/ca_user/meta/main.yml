@@ -1,19 +1,34 @@
+---
 galaxy_info:
   author: Andrew Shagayev
-  description: Cross-platform ansible role for hardening ssh daemon configuration by setting up User Certificate Authentication.
+  description: |
+    Cross-platform ansible role for hardening ssh daemon configuration,
+    by configuring SSH User Certificate Authentication.
   license: MIT
   min_ansible_version: 1.2
   github_branch: master
   platforms:
-    - name: Debian
-      versions:
-        - all
     - name: MacOSX
       versions:
         - 10.12
         - 10.13
+    - name: Debian
+      versions:
+        - all
+    - name: LibreELEC
+      versions:
+        - all
+    - name: FreeBSD
+      versions:
+        - all
   galaxy_tags:
     - ssh
     - sshd
     - secure_shell
-dependencies: []
+
+dependencies:
+  - role: common
+    tags:
+      - ssh_userCA
+      - ssh_userCA_remote
+      - ssh_userCA_revoke

@@ -1,39 +1,59 @@
 ---
-# LOCAL SSH CLIENT WORKSTATION TASKS
+## LOCAL SSH CLIENT WORKSTATION TASKS
+
+## the 'regenerate: never' marks the task 'changed' when used with passphrase, thus:
+- name: "[local.yml] LOCAL: Check if UserCA key exists"
+  ansible.builtin.stat:
+    path: "{{ ssh_userCA.path | string }}"
+  register: ssh_userCA_privkey_file
 
 - name: "[local.yml] LOCAL: Generate UserCA if it does not exist"
-  # Using defaults here to make possible specifying only some of the properties
-  # for ssh_userCA var at the play level so that skipping the rest won't cause isses. E.g.:
-  #   ssh_userCA:
-  #     path: /path/override
+  ## Using defaults here to make possible specifying only some of the properties
+  ## for ssh_userCA var at the play level so that skipping the rest won't cause isses. E.g.:
+  ##   ssh_userCA:
+  ##     path: /path/override
   community.crypto.openssh_keypair:
-    path:           "{{ ssh_userCA.path|string }}"
-    type:           "{{ ssh_userCA.type|default(omit) }}"
-    size:           "{{ ssh_userCA.size|default(None)|int or omit }}"
-    comment:        "{{ ssh_userCA.comment|default(omit) }}"
-    passphrase:     "{{ ssh_userCA_key.passphrase|default(omit) }}"
-    # NOTE: regenerate key if it does not conform with set options
-    # Fail if the passphrase is wrong.
-    #regenerate:     "{{ 'partial_idempotence' if ssh_userCA.passphrase is defined else 'never' }}"
-    # NOTE: don't regenerate key if it exists but does not conform with set options:
-    regenerate:     never
-    backend:        auto
+    path: "{{ ssh_userCA.get('path')|string }}"
+    type: "{{ ssh_userCA.get('type', omit) }}"
+    size: "{{ ssh_userCA.get('size') | int(default=None) | default(omit) }}"
+    comment: "{{ ssh_userCA.get('comment', omit) }}"
+    passphrase: "{{ ssh_userCA_key.passphrase|default(omit) }}"
+    ## NOTE: regenerate key if it does not conform with set options
+    ## Fail if the passphrase is wrong.
+    # regenerate:     "{{ 'partial_idempotence' if ssh_userCA.passphrase is defined else 'never' }}"
+    ## NOTE: don't regenerate key if it exists but does not conform with set options:
+    regenerate: >-
+      {{
+        'full_idempotence'
+          if (ssh_userCA.get('regenerate', false)) is sameas(true)
+        else 'never'
+          if (ssh_userCA.get('regenerate', false)) is sameas(false)
+        else ssh_userCA.regenerate
+      }}
+    backend: auto  # falls back to cryptography python module because passphrase is used.
+  when: not ssh_userCA_privkey_file.stat.exists
 
 - name: "[local.yml] LOCAL: Issue User Certificates"
   community.crypto.openssh_cert:
-    type:           user
-    valid_from:     always
-    valid_to:       "{{ ssh_userCA_cert.expiry|default('forever')|string }}"
-    signing_key:    "{{ ssh_userCA.path|string }}"
-    public_key:     "{{ item.1 }}"
-    path:           "{{ (item.1.split('.pub')|map('trim'))|join+'-cert.pub' }}"
-    serial_number:  "{{ item.0.sn|int }}"
-    principals:     "{{ item.0.principal.split(',')|list }}"
-    identifier:     "{{ item.0.id|string }}"  # cert won't be reissued even if id is new
+    type: user
+    valid_from: "{{ ssh_userCA_cert.get('valid_from', 'always')|string }}"
+    valid_to: "{{ ssh_hostCA_cert.get('valid_to', 'forever')|string }}"
+    signing_key: "{{ ssh_userCA.get('path')|string }}"
+    public_key: "{{ item.1 }}"
+    path: "{{ item.1 | regex_replace('\\.pub$', '') }}-cert.pub"
+    serial_number: "{{ item.0.sn|int }}"
+    principals: "{{ item.0.principal.split(',')|list }}"
+    identifier: "{{ item.0.id|string }}"
   register: ssh_userCA_certs_issued
-  with_nested:
-    - "{{ ssh_userCA_cert.principals }}"
-    - "{{ lookup('fileglob', ssh_userCA_keys_path+'/*.pub').split(',') }}"
+  # with_nested:
+  #  - "{{ ssh_userCA_cert.principals }}"
+  #  - "{{ lookup('fileglob', ssh_userCA_keys_path+'/*.pub', wantlist=True) }}"
+  loop: >-
+    {{
+      ssh_userCA_cert.principals
+      | product(lookup('fileglob', ssh_userCA_keys_path+'/*.pub', wantlist=True))
+      | list
+    }}
   when:
     - "item.0.user in item.1"
     - "'-cert.pub' not in item.1"

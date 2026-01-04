@@ -1,0 +1,29 @@
+# SPDX-License-Identifier: MIT-0
+---
+# tasks file for daemon_cfg
+
+## USER-SPECIFIC SSHD CONFIG:
+- name: "[users.yml] Add user-specific sshd_config Match blocks"
+  ansible.builtin.blockinfile:
+    path: "{{ ssh_common_daemon_cfg }}"
+    marker: "# {mark} ANSIBLE MANAGED Match block for {{ item.user }}"
+    block: |
+      Match User {{ item.user }}
+      {% for entry in item.config %}
+      {{ '  ' + entry.stanza + ' ' +
+        (entry.value is boolean
+        |ternary(entry.value|ternary('yes','no'),entry.value|string))
+      }}
+      {% endfor %}
+  loop: "{{ ssh_daemon_cfg_users }}"
+  become: true
+  notify: Reload sshd
+
+- name: "[users.yml] Add spacing before user-specific sshd_config blocks"
+  ansible.builtin.lineinfile:
+    path: "{{ ssh_common_daemon_cfg }}"
+    line: " "
+    insertbefore: '^# BEGIN ANSIBLE MANAGED Match block for.*$'
+    state: present
+  loop: "{{ ssh_daemon_cfg_users }}"
+  become: true

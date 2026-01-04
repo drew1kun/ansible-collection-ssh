@@ -1,0 +1,20 @@
+# SPDX-License-Identifier: MIT-0
+---
+# tasks file for daemon_cfg
+- name: "[main.yml] Import general sshd config tasks"
+  ansible.builtin.import_tasks: general.yml
+  tags:
+    - ssh_daemon_cfg
+    - ssh_daemon_cfg_general
+
+- name: "[main.yml] Include user-specific sshd config tasks"
+  ansible.builtin.include_tasks:
+    file: users.yml
+    apply:
+      tags: &ssh_daemon_cfg_tags
+        - ssh_daemon_cfg
+        - ssh_daemon_cfg_users
+  tags: *ssh_daemon_cfg_tags
+  when:
+    - ssh_daemon_cfg_users is defined
+    - ssh_daemon_cfg_users | length > 0

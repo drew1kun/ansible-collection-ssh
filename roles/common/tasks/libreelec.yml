@@ -1,0 +1,61 @@
+---
+- name: "[libreelec.yml] Ensure persistent SSH config directories exist"
+  file:
+    path: "{{ ssh_common_cfg_path }}"
+    state: directory
+    mode: '0700'
+    owner: "{{ ssh_common_owner }}"
+    group: "{{ ssh_common_group }}"
+  notify: Reload sshd
+  loop_control:
+    loop_var: ssh_common_cfg_path
+  loop:
+    - "~/.config/system.d/sshd.service.d"
+    - "{{ ssh_common_etc_dir }}"
+
+- name: "[libreelec.yml] Check if SSH daemon config files exist"
+  stat:
+    path: "{{ ssh_common_cfg_file.path }}"
+  loop: "{{ ssh_common_cfg_files }}"
+  loop_control:
+    loop_var: ssh_common_cfg_file
+  register: ssh_common_cfg
+  vars:
+    ssh_common_cfg_files:
+      - path: "{{ ssh_common_daemon_cfg }}"
+        src: /etc/ssh/sshd_config
+        regenerate: false
+      - path: "{{ ansible_env.HOME }}/.config/system.d/sshd.service.d/config_file.conf"
+        content: |
+          [Service]
+          ExecStart=
+          ExecStart=/usr/sbin/sshd -D -f "{{ ssh_common_daemon_cfg }}" $SSH_ARGS
+        regenerate: true
+
+- name: "[libreelec.yml] Create missing SSH persistent config files"
+  copy:
+    dest: "{{ ssh_common_cfg_file_result.ssh_common_cfg_file.path }}"
+    src: "{{ ssh_common_cfg_file_result.ssh_common_cfg_file.src | default(omit) }}"
+    content: "{{ ssh_common_cfg_file_result.ssh_common_cfg_file.content | default(omit) }}"
+    owner: "{{ ssh_common_owner }}"
+    group: "{{ ssh_common_group }}"
+    mode: '0600'
+    remote_src: "{{ ssh_common_cfg_file_result.ssh_common_cfg_file.src is defined }}"
+  ## Reducing noise by looping through the items that need regenration only:
+  # loop: "{{ ssh_common_cfg.results }}"
+  loop: >-
+    {{
+      ssh_common_cfg.results
+      | selectattr('stat.exists', 'equalto', false)
+      | union (
+        ssh_common_cfg.results
+        | selectattr('ssh_common_cfg_file.regenerate', 'defined')
+        | selectattr('ssh_common_cfg_file.regenerate', 'equalto', true)
+        ) | list
+    }}
+  loop_control:
+    loop_var: ssh_common_cfg_file_result
+  notify: Reload sshd
+  when:
+    - not ssh_common_cfg_file_result.stat.exists or
+      ssh_common_cfg_file_result.ssh_common_cfg_file.regenerate|bool

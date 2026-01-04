@@ -1,0 +1,53 @@
+# SPDX-License-Identifier: MIT-0
+---
+# handlers file for common
+- name: 'Reload sshd on Linux with systemd'
+  become: true
+  when: ansible_service_mgr|lower == 'systemd'
+  tags:
+    - always
+  block:
+    - name: 'Reload systemd daemon'
+      ansible.builtin.systemd_service:
+        daemon_reload: true
+      listen: Reload sshd
+
+    ## "systemclt reload sshd" is not enough, "systemctl restart sshd" is required,
+    ## "systemd_service" module loses connection when restarting sshd, so using command:
+    - name: "Restart systemd {{ ssh_common_svc|default('sshd') }} service"
+      ansible.builtin.command: >-
+        systemd-run
+        --on-active=10s
+        --unit=sshd-restart-{{ 99999|random }}
+        systemctl restart {{ ssh_common_svc|default('sshd') }}
+      listen: Reload sshd
+
+- name: 'Reload sshd on MacOS'
+  community.general.launchd:
+    name: "com.openssh.sshd"
+    plist: ssh.plist
+    state: restarted
+  become: true
+  tags: always
+  listen: Reload sshd
+  when: ansible_system|lower == 'darwin'
+
+- name: 'Reload sshd on other Unix systems'
+  ansible.builtin.service:
+    name: "{{ ssh_common_svc|default('sshd') }}"
+    state: reloaded
+  become: true
+  tags: always
+  listen: Reload sshd
+  when:
+    - ansible_system|lower not in ['darwin']  # os list can be expanded further...
+    - ansible_service_mgr != 'systemd'
+
+- name: 'Reload sshd on pfSense: force reload /etc/sshd_extra'
+  ansible.builtin.command:
+    cmd: >-
+      pfSsh.php playback svc restart sshd
+  become: true
+  check_mode: false
+  listen: Reload sshd
+  when: ssh_common_is_pfsense|default(false)

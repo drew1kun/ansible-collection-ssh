@@ -1,27 +1,43 @@
 ---
 - name: "[local.yml] LOCAL: Generate HostCA if it does not exist"
-  # Using defaults here to make possible specifying only some of the properties
-  # for ssh_hostCA var at the play level so that skipping the rest won't cause isses. E.g.:
+  ## Using defaults here to make possible specifying only some of the properties
+  ## for ssh_hostCA var at the play level so that skipping the rest won't cause isses. E.g.:
   #   ssh_hostCA:
   #     path: /path/override
   community.crypto.openssh_keypair:
-    path:          "{{ ssh_hostCA.path|string }}"
-    size:          "{{ ssh_hostCA.size|default(None)|int or omit }}"
-    type:          "{{ ssh_hostCA.type|default(omit) }}"
-    comment:       "{{ ssh_hostCA.comment|default(omit) }}"
-    passphrase:    "{{ ssh_hostCA.passphrase|default(omit) }}"
-    # NOTE: regenerate key if it does not conform with set options
-    # Fail if the passphrase is wrong.
-    #regenerate:    "{{ 'partial_idempotence' if ssh_hostCA.passphrase is defined else 'never' }}"
-    # NOTE: don't regenerate key if it exists but does not conform with set options:
-    regenerate:    never
-    backend:       auto
-  run_once:        true
+    path: "{{ ssh_hostCA.get('path') | string }}"
+    type: "{{ ssh_hostCA.get('type', 'ed25519') }}"
+    size: "{{ ssh_hostCA.get('size') | int(default=None) | default(omit) }}"
+    comment: "{{ ssh_hostCA.get('comment', omit) }}"
+    passphrase: "{{ ssh_hostCA.get('passphrase', omit) }}"
+    regenerate: >-
+      {{
+        'full_idempotence'
+          if (ssh_hostCA.get('regenerate', false)) is sameas(true)
+        else 'never'
+          if (ssh_hostCA.get('regenerate', false)) is sameas(false)
+        else ssh_hostCA.regenerate
+      }}
+    backend: auto
+  run_once: true
 
-- name: "[local.yml] LOCAL: Make sure ~/.ssh/known_hosts is aware of the trusted HostCA"
+- name: "[local.yml] LOCAL: Make sure /etc/ssh/ssh_known_hosts is aware of the trusted HostCA"
   ansible.builtin.lineinfile:
-    path:          ~/.ssh/known_hosts
-    line:          "{{ item }}"
-    search_string: "{{ item }}"
-    insertbefore:  "BOF"
-  loop: "{{ ssh_hostCA_knownhosts|flatten(1) }}"
+    path: /etc/ssh/ssh_known_hosts
+    line: >-
+      {{
+        '@cert-authority'
+        ~ ' '
+        ~ (ssh_hostCA_knownhosts_domains|join(','))
+        ~ ' '
+        ~ lookup('file', ssh_hostCA.path ~ '.pub')
+      }}
+    search_string: >-
+      {{
+        '@cert-authority'
+        ~ ' '
+        ~ (ssh_hostCA_knownhosts_domains|join(','))
+      }}
+    insertbefore: "BOF"
+    create: true
+  become: true

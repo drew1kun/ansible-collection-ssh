@@ -1,0 +1,6 @@
+---
+ssh_common_svc: sshd
+ssh_common_etc_dir: /storage/.config/ssh
+ssh_common_daemon_cfg: "{{ ssh_common_etc_dir }}/sshd_config"
+ssh_common_owner: root
+ssh_common_group: root

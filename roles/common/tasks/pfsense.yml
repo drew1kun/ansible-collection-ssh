@@ -1,0 +1,46 @@
+---
+## Determine if the FreeBSD system is actually pfSense variant or not
+
+- name: "[pfsense.yml] Stat the list of pfsense-specific files"
+  stat:
+    path: "{{ ssh_common_pfsense_path }}"
+  loop:
+    - /etc/platform
+    - /conf/config.xml
+    - /etc/inc/system.inc
+  loop_control:
+    loop_var: ssh_common_pfsense_path
+  register: ssh_common_pfsense
+
+- name: "[pfsense.yml] Read /etc/platform"
+  slurp:
+    path: /etc/platform
+  register: ssh_common_pfsense_platform
+  failed_when: false
+  changed_when: false
+
+- name: "[pfsense.yml] Set ssh_common_is_pfsense variable"
+  set_fact:
+    ssh_common_is_pfsense: >-
+      {{
+        ansible_system == 'FreeBSD'
+        and ('pfsense' in (ansible_hostname | lower))
+        and ( ssh_common_pfsense.results | default([])
+          | selectattr('stat.exists','eq',true)
+          | list | length ) == 3
+        and
+          (
+            ssh_common_pfsense_platform.content
+            |default('')|b64decode|trim|lower
+          ) == 'pfsense'
+      }}
+
+- name: "[pfsense.yml] ATTENTION!"
+  debug:
+    msg: |
+      {{ ssh_common_is_pfsense
+        | ternary(
+          'pfSense is detected!',
+          'pfSense is not detected!')
+      }}
+      ssh_common_daemon_cfg: {{ ssh_common_daemon_cfg }}

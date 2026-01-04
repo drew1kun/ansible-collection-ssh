@@ -1,0 +1,23 @@
+# SPDX-License-Identifier: MIT-0
+---
+# vars file for daemon_cfg
+
+ssh_daemon_cfg: >-
+  {{
+    (
+      ssh_daemon_cfg_base
+      | rejectattr('stanza', 'in',
+          (
+            (ssh_daemon_cfg_override | default([]) | map(attribute='stanza') | list)
+            +
+            (ssh_daemon_cfg_override_rm | default([]))
+          )
+        )
+    )
+    +
+    (
+      ssh_daemon_cfg_override | default([])
+      | rejectattr('stanza', 'in', ssh_daemon_cfg_override_rm | default([]))
+    )
+    | list
+  }}

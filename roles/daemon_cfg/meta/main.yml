@@ -1,12 +1,12 @@
+# SPDX-License-Identifier: MIT-0
 ---
 galaxy_info:
-  author: Andrew Shagayev
+  author: your name
   description: |
-    Cross-platform ansible role for hardening ssh daemon configuration,
-    by setting up SSH Host Certificate Authentication.
+    Cross-platform ansible role for ssh daemon configration.
+  company: your company (optional)
   license: MIT
-  min_ansible_version: 1.2
-  github_branch: master
+  min_ansible_version: 2.1
   platforms:
     - name: MacOSX
       versions:
@@ -28,5 +28,6 @@ galaxy_info:
 dependencies:
   - role: common
     tags:
-      - ssh_hostCA
-      - ssh_hostCA_remote
+      - ssh_daemon_cfg
+      - ssh_daemon_cfg_general
+      - ssh_daemon_cfg_users
