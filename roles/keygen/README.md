@@ -4,7 +4,7 @@ Ansible role: ssh.keygen
 [![MIT licensed][mit-badge]][mit-link]
 [![Galaxy Collection][collection-badge]][galaxy-link]
 
-Cross-platform ansible role for generating SSH keypairs. 
+Cross-platform ansible role for generating SSH keypairs.
 
 The role is the part of collection for configruing SSH authentication using Certificate Chain of Trust.
 
@@ -36,11 +36,22 @@ Please review:
  - [`defaults/linux.yml`](vars/linux.yml)
  - [`defaults/freebsd.yml`](vars/freebsd.yml)
  - [`defaults/darwin.yml`](vars/darwin.yml)
- 
+
 Dependencies
 ----
 
-None
+At least on MacOS the following python modules are required:
+- bcrypt
+- cryptography
+
+Initiate the venv and install them:
+
+```bash
+python3 -m venv ~/.venvs/ansible-env
+source ~/.venvs/ansible-env/bin/activate
+pip install --upgrade pip
+pip install bcrypt cryptography
+```
 
 Example Playbook
 ----

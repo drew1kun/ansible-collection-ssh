@@ -1,0 +1,51 @@
+# SPDX-License-Identifier: MIT-0
+---
+## defaults file for daemon_cfg
+
+## GENERAL SSHD CONFIG:
+## This allows to override some portions of ssh_daemon_cfg_base default var
+## per group/host at the play level, WITHOUT keeping code duplications.
+## E.g.:
+## set ssh_daemon_cfg_base in group_vars/all/ssh.daemon_cfg.yml
+ssh_daemon_cfg_base:
+  - stanza: LoginGraceTime
+    value: '2m'
+    comment: 'Set login grace time to 2 minutes'
+  - stanza: PermitRootLogin
+    value: 'no'
+    comment: 'Disallow root login via ssh'
+
+## This var is optional, and should be defined via group_vars/host_vars like:
+# ssh_daemon_cfg_override:
+#   - stanza: 'PermitRootLogin'
+#     value: 'yes'
+#     comment: 'Allow root login for kodi group only'
+
+## if 'value' is present and empty, all matching stanzas will be commented out
+## if 'value' is not emptly, only matching strings <'stanza '>+<'value'> will be commented out
+ssh_daemon_cfg_disable:
+  - stanza: Include
+    value: '/etc/ssh/sshd_config.d/*.conf'
+
+## USER-SPECIFIC SSHD CONFIG:
+## this will result in the following Match blocks being added:
+## BEGIN ANSIBLE MANAGED Match block for drew
+## Match User anoncvs
+##  X11Forwarding no
+##  AllowTcpForwarding no
+##  PermitTTY no
+##  ForceCommand cvs server
+## END ANSIBLE MANAGED Match block for drew
+#
+## If no user config is required, then just redefine the var as an empty list:
+ssh_daemon_cfg_users:
+  - user: anoncvs
+    config:
+      - stanza: X11Forwarding
+        value: 'no'
+      - stanza: AllowTcpForwarding
+        value: 'no'
+      - stanza: PermitTTY
+        value: 'no'
+      - stanza: ForceCommand
+        value: 'cvs server'

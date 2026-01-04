@@ -1,0 +1,13 @@
+---
+ssh_common_etc_dir: /etc/ssh
+
+# NOTE: Pfsense stores config at /etc/sshd_extra,
+# while FreeBSD stores it at /etc/ssh/sshd_config
+ssh_common_daemon_cfg: >-
+  {{
+    '/etc/sshd_extra'
+    if ssh_common_is_pfsense|default(false)
+    else ssh_common_etc_dir ~ '/sshd_config'
+  }}
+ssh_common_owner: root
+ssh_common_group: wheel

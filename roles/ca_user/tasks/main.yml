@@ -1,22 +1,4 @@
 ---
-- name: '[main.yml] If System is FreeBSD determine whether it is pfSense or not'
-  stat:
-    path: "{{ item }}"
-  listen: Reload sshd
-  loop:
-    - /conf/config.xml
-    - /etc/inc/system.inc
-  register: ssh_userCA_pfsense
-  when: "'FreeBSD' in ansible_system"
-
-- name: "[main.yml] Include {{ ansible_system }}-specific variables"
-  ansible.builtin.include_vars: "{{ ansible_system|lower }}.yml"
-  tags:
-    - ssh_userCA
-    - ssh_userCA_local
-    - ssh_userCA_remote
-    - ssh_userCA_revoke
-
 - name: "[main.yml] Import local tasks"
   ansible.builtin.import_tasks: local.yml
   delegate_to: localhost
@@ -32,17 +14,11 @@
     - ssh_userCA_remote
 
 - name: "[main.yml] Import tasks: revoke"
-  ansible.builtin.import_tasks: revoke.yml
-  when:
-    - ssh_userCA_revoked
-    - ssh_userCA_revoked|length
-  tags:
-    - ssh_userCA
-    - ssh_userCA_revoke
-
-- name: "[main.yml] Flush handlers"
-  ansible.builtin.meta: flush_handlers
-  tags:
-    - ssh_userCA
-    - ssh_userCA_remote
-    - ssh_userCA_revoke
+  ansible.builtin.include_tasks:
+    file: revoke.yml
+    apply:
+      tags:
+        - ssh_userCA
+        - ssh_userCA_revoke
+  when: (ssh_userCA_crt_revoked | default([])) | length > 0
+  tags: always

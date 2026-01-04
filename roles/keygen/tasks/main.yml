@@ -1,5 +1,5 @@
 ---
-# tasks file for keygen
+## tasks file for keygen
 
 - name: "[main.yml] Create list of paths for keys to be generated"
   ansible.builtin.set_fact:
@@ -9,8 +9,9 @@
         + [item.path.split('/')[:-1]|join('/')]
       }}
   no_log: true
-  loop: "{{ ssh_keygen_keys|flatten(1) }}"
-  tags: ['ssh_keygen']
+  loop: "{{ ssh_keygen_keys }}"
+  tags: &ssh_keygen_tags
+    - ssh_keygen
 
 - name: "[main.yml] Ensure the keys path dirs exist on Managed Host"
   ansible.builtin.file:
@@ -18,18 +19,27 @@
     state: directory
     mode: '0755'
   loop: "{{ ssh_keygen_paths|unique }}"
-  tags: ['ssh_keygen']
+  tags: *ssh_keygen_tags
 
 - name: "[main.yml] Generate User Keypair"
   community.crypto.openssh_keypair:
-    path:           "{{ item.path|string }}"
-    type:           "{{ item.type|default(None)|string or omit }}"
-    size:           "{{ item.size|default(None)|int or omit }}"
-    comment:        "{{ item.comment|default(None)|string or omit }}"
-    passphrase:     "{{ item.passphrase|default(None)|string or omit }}"
-    # NOTE: don't regenerate key if it exists but does not conform with set options:
-    regenerate:     "{{ 'always' if ssh_keygen_reissue else 'full_idempotence' }}"
+    path: "{{ ssh_keygen_key.get('path', '~/.ssh') }}"
+    type: "{{ ssh_keygen_key.get('type', omit) }}"
+    size: "{{ ssh_keygen_key.get('size') | int(default=None) | default(omit) }}"
+    comment: "{{ ssh_keygen_key.get('comment', omit) }}"
+    passphrase: "{{ ssh_keygen_key.get('passphrase', omit) }}"
+    ## NOTE: don't regenerate key if it exists but does not conform with set options:
+    regenerate: >-
+      {{
+        'full_idempotence'
+          if (ssh_userCA.get('regenerate', false)) is sameas(true)
+        else 'never'
+          if (ssh_userCA.get('regenerate', false)) is sameas(false)
+        else ssh_userCA.regenerate
+      }}
     backend: auto
   register: ssh_keygen_issued
-  loop: "{{ ssh_keygen_keys|flatten(1) }}"
-  tags: ['ssh_keygen']
+  loop: "{{ ssh_keygen_keys }}"
+  loop_control:
+    loop_var: ssh_keygen_key
+  tags: *ssh_keygen_tags

@@ -1,7 +1,9 @@
 ---
 - name: "[info.yml] REMOTE: Get newly issued Host Certificate details"
   vars:
-    ssh_hostCA_cert_list_cmd: "ssh-keygen -L -f {{ ssh_hostCA_etc_dir }}/ssh_host_{{ ssh_hostCA_key.type|default('ed25519') }}_key-cert.pub"
+    ssh_hostCA_cert_list_cmd: >-
+      ssh-keygen -L -f
+      {{ ssh_common_etc_dir }}/ssh_host_{{ ssh_hostCA_key.type|default('ed25519') }}_key-cert.pub
   ansible.builtin.shell: "{{ item }}"
   register: ssh_hostCA_new_cert
   changed_when: false
@@ -9,7 +11,6 @@
     - "{{ ssh_hostCA_cert_list_cmd }}"
     - "{{ ssh_hostCA_cert_list_cmd }} | grep 'Serial: ' | xargs | cut -d ' ' -f2 "
   become: true
-  when: ssh_hostCA_cert_issued.changed
 
 - name: "[info.yml] INFO: THE CERTIFICATE SERIAL NUMBER HAS CHANGED!"
   debug:
@@ -26,4 +27,3 @@
 - name: "[info.yml] INFO: PLEASE MAKE SURE THE PRINCIPALS OF ISSUED CERT ARE CORRECT"
   debug:
     msg: "{{ ssh_hostCA_new_cert.results.0.stdout }}"
-  when: ssh_hostCA_cert_issued.changed
