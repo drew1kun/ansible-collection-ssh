@@ -1,0 +1,30 @@
+# SPDX-License-Identifier: MIT-0
+---
+# tasks file for common
+
+- name: "[main.yml] Include {{ ansible_distribution }}-specific variables"
+  ansible.builtin.include_vars:
+    file: "{{ ansible_distribution | lower }}.yml"
+  tags: &ssh_common_tags
+    - ssh_hostCA
+    - ssh_hostCA_local
+    - ssh_hostCA_remote
+    - ssh_userCA
+    - ssh_userCA_local
+    - ssh_userCA_remote
+    - ssh_userCA_revoke
+    - ssh_daemon_cfg
+    - ssh_daemon_cfg_general
+    - ssh_daemon_cfg_users
+
+- name: "[main.yml] Include {{ ansible_distribution }}-specific pre-tasks"
+  ansible.builtin.include_tasks:
+    file: "{{ ssh_common_pre_tasks[ansible_os_family | lower] }}"
+    apply:
+      tags: *ssh_common_tags
+  when: ansible_os_family | lower in ['freebsd', 'libreelec']
+  vars:
+    ssh_common_pre_tasks:
+      freebsd: pfsense.yml
+      libreelec: libreelec.yml
+  tags: *ssh_common_tags

@@ -1,0 +1,73 @@
+# SPDX-License-Identifier: MIT-0
+---
+# tasks file for daemon_cfg
+
+## GENERAL SSHD CONFIG
+- name: "[general.yml] Configure SSH daemon"
+  ansible.builtin.lineinfile:
+    path: "{{ ssh_common_daemon_cfg }}"
+    ## matches:'#UsePAM yes','# UsePAM yes','UsePAM yes'
+    # regexp: '^(#\s*)?{{ item.stanza }}\s+.*$'
+    ## matches:'#UsePAM yes','UsePAM yes', but NOT '# UsePAM yes':
+    regexp: '^#?{{ item.stanza }}\s+.*$'
+    ## 'yes' and 'no' are being converted to boolean if not quoted,
+    ## thus use yes/no otherwise, use string:
+    line: >-
+      {{ item.stanza }}
+      {{
+        (item.value is boolean)
+        |ternary(item.value|ternary('yes', 'no'), item.value)
+      }}
+    insertafter: EOF
+    create: true
+    state: present
+  loop: "{{ ssh_daemon_cfg }}"
+  register: ssh_daemon_cfg_stanza_check
+  notify: Reload sshd
+  become: true
+
+- name: "[general.yml] Add optional comments (only if stanza changed)"
+  ansible.builtin.lineinfile:
+    path: "{{ ssh_common_daemon_cfg }}"
+    line: "# {{ item.item.comment }}"
+    insertbefore: '^[# ]*{{ item.item.stanza }}\s+'
+    state: present
+  become: true
+  ## Decreasing about of noice in the log output, instead of:
+  # loop: {{ ssh_daemon_cfg_stanza_check.results }}
+  loop: >-
+    {{
+      ssh_daemon_cfg_stanza_check.results
+      | selectattr('changed')
+      | selectattr('item.comment', 'defined')
+      | selectattr('item.comment', 'truthy')
+      | list
+    }}
+  when:
+    - item.changed
+    - item.item.comment is defined
+    - item.item.comment | length > 0
+
+# This task MUST be writtend WITHOUT yuml foldings (>-),
+# as they produce string instead of list, which breaks the next task
+- name: "[general.yml] Set regex for disabling sshd_config stanzas"
+  ansible.builtin.set_fact:
+    ssh_daemon_cfg_disable_regexes: "{{ ssh_daemon_cfg_disable_regexes | default([])
+      + [{ 'regexp': '^(?!\\s*#)\\s*' ~ item.stanza ~ '\\s+' ~
+        ((item.value is defined
+        and item.value is not none
+        and (item.value | length) > 0)
+        | ternary((item.value | default(''))
+        | regex_escape, '.+')) }] }}"
+  loop: "{{ ssh_daemon_cfg_disable | default([]) }}"
+  when: ssh_daemon_cfg_disable | default([]) | length > 0
+
+- name: "[general.yml] Comment out sshd_config stanzas if defined"
+  ansible.builtin.replace:
+    path: "{{ ssh_common_daemon_cfg }}"
+    regexp: "{{ item.regexp }}"
+    replace: '#\g<0>'
+  loop: "{{ ssh_daemon_cfg_disable_regexes }}"
+  when: ssh_daemon_cfg_disable_regexes | default([]) | length > 0
+  notify: Reload sshd
+  become: true
