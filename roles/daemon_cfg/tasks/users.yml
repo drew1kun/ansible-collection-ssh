@@ -11,8 +11,13 @@
       Match User {{ item.user }}
       {% for entry in item.config %}
       {{ '  ' + entry.stanza + ' ' +
-        (entry.value is boolean
-        |ternary(entry.value|ternary('yes','no'),entry.value|string))
+        ( entry.value is boolean
+        | ternary(
+          entry.value | ternary('yes', 'no'),
+            ( entry.value is iterable and entry.value is not string )
+            | ternary(entry.value | join(','), entry.value)
+          )
+        )
       }}
       {% endfor %}
   loop: "{{ ssh_daemon_cfg_users }}"

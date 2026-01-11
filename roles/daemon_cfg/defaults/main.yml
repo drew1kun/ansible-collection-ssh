@@ -14,6 +14,11 @@ ssh_daemon_cfg_base:
   - stanza: PermitRootLogin
     value: 'no'
     comment: 'Disallow root login via ssh'
+  - stanza: Ciphers
+    value:
+      - aes256-ctr
+      - aes192-ctr
+      - aes128-ctr
 
 ## This var is optional, and should be defined via group_vars/host_vars like:
 # ssh_daemon_cfg_override:
@@ -41,6 +46,10 @@ ssh_daemon_cfg_disable:
 ssh_daemon_cfg_users:
   - user: anoncvs
     config:
+      - stanza: AuthenticationMethods
+        value:
+          - publickey
+          - password
       - stanza: X11Forwarding
         value: 'no'
       - stanza: AllowTcpForwarding
@@ -49,3 +58,4 @@ ssh_daemon_cfg_users:
         value: 'no'
       - stanza: ForceCommand
         value: 'cvs server'
+
