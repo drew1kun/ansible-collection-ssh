@@ -11,12 +11,18 @@
     ## matches:'#UsePAM yes','UsePAM yes', but NOT '# UsePAM yes':
     regexp: '^#?{{ item.stanza }}\s+.*$'
     ## 'yes' and 'no' are being converted to boolean if not quoted,
-    ## thus use yes/no otherwise, use string:
+    ## thus use yes/no otherwise, use string. If the value is list,
+    ## create a string of list intems separated by commas:
     line: >-
       {{ item.stanza }}
       {{
         (item.value is boolean)
-        |ternary(item.value|ternary('yes', 'no'), item.value)
+        | ternary(
+          item.value | ternary('yes', 'no'),
+            (
+              item.value is iterable and item.value is not string
+            ) | ternary(item.value | join(','), item.value)
+          )
       }}
     insertafter: EOF
     create: true
