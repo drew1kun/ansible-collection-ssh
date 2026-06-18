@@ -1,7 +1,7 @@
 ---
 galaxy_info:
   role_name: ssh_ca_user
-  author: 
+  author: drew
   description: |
     Cross-platform ansible role for hardening ssh daemon configuration,
     by configuring SSH User Certificate Authentication.
