@@ -1,7 +1,7 @@
 ---
 galaxy_info:
   role_name: ssh_common
-  author: 
+  author: drew1kun
   description: |
     Dependency role for ca_user and ca_host cross-platform ansible roles.
     Contains common vars and handlers used by the mentioned roles

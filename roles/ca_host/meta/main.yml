@@ -1,7 +1,7 @@
 ---
 galaxy_info:
   role_name: ssh_ca_host
-  author: 
+  author: drew1kun
   description: |
     Cross-platform ansible role for hardening ssh daemon configuration,
     by setting up SSH Host Certificate Authentication.

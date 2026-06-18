@@ -1,7 +1,7 @@
 ---
 galaxy_info:
   role_name: ssh_keygen
-  author: 
+  author: drew1kun
   description: |
     Cross-platform ansible role for generating user SSH keys.
   license: MIT

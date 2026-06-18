@@ -2,7 +2,7 @@
 ---
 galaxy_info:
   role_name: ssh_daemon_cfg
-  author: 
+  author: drew1kun
   description: |
     Cross-platform ansible role for ssh daemon configration.
   license: MIT

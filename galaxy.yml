@@ -1,10 +1,10 @@
 ---
 namespace: drew1kun
 name: ssh
-version: 1.1.2
+version: 1.1.3
 readme: README.md
 authors:
-  -  <>
+  - drew1kun <snub-museum-body@duck.com>
 description: |
   Ansible collection for configuring SSH authentication with Ceritifcate Chain of Trust
 
