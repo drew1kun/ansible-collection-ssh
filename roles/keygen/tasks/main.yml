@@ -8,38 +8,83 @@
         ssh_keygen_paths|default([])
         + [item.path.split('/')[:-1]|join('/')]
       }}
-  no_log: true
+  no_log: true  # items may contain passphrase
   loop: "{{ ssh_keygen_keys }}"
   tags: &ssh_keygen_tags
     - ssh_keygen
 
 - name: "[main.yml] Ensure the keys path dirs exist on Managed Host"
   ansible.builtin.file:
-    path: "{{ item }}"
+    path: "{{ ssh_keygen_path }}"
     state: directory
     mode: '0755'
-  loop: "{{ ssh_keygen_paths|unique }}"
+  loop: "{{ ssh_keygen_paths | unique }}"
+  loop_control:
+    loop_var: ssh_keygen_path
+    label: "{{ ssh_keygen_path }}"
   tags: *ssh_keygen_tags
 
-- name: "[main.yml] Generate User Keypair"
-  community.crypto.openssh_keypair:
-    path: "{{ ssh_keygen_key.get('path', '~/.ssh') }}"
-    type: "{{ ssh_keygen_key.get('type', omit) }}"
-    size: "{{ ssh_keygen_key.get('size') | int(default=None) | default(omit) }}"
-    comment: "{{ ssh_keygen_key.get('comment', omit) }}"
-    passphrase: "{{ ssh_keygen_key.get('passphrase', omit) }}"
-    ## NOTE: don't regenerate key if it exists but does not conform with set options:
-    regenerate: >-
-      {{
-        'full_idempotence'
-          if (ssh_userCA.get('regenerate', false)) is sameas(true)
-        else 'never'
-          if (ssh_userCA.get('regenerate', false)) is sameas(false)
-        else ssh_userCA.regenerate
-      }}
-    backend: auto
-  register: ssh_keygen_issued
-  loop: "{{ ssh_keygen_keys }}"
-  loop_control:
-    loop_var: ssh_keygen_key
+- name: "[main.yml] Generate Keypair"
+  block:
+    - name: "[main.yml] Generate Keypair using Cryptography python module"
+      ## Using `.get()|default` structure to make possible specifying only some of the properties
+      ## for ssh_ca_host__ca var at the play level so that skipping the rest won't cause isses. E.g.:
+      #   ssh_ca_host:
+      #     path: /path/override
+      community.crypto.openssh_keypair:
+        <<: &ssh_keygen__openssh_keypair
+          path: "{{ ssh_keygen_key.get('path', '~/.ssh') | default('~/.ssh') }}"
+          type: "{{ ssh_keygen_key.get('type', 'ed25519') | default('ed25519') }}"
+          size: "{{ ssh_keygen_key.get('size', omit) | default(omit) }}"
+          comment: "{{ ssh_keygen_key.get('comment', omit) | default(omit) }}"
+          passphrase: "{{ ssh_keygen_key.get('passphrase', omit) | default(omit) }}"
+          owner: "{{ ssh_keygen_key.get('owner', ssh_keygen_owner) | default(ssh_keygen_owner) }}"
+          group: "{{ ssh_keygen_key.get('group', ssh_keygen_group) | default(ssh_keygen_group) }}"
+          ## NOTE: regenerate key if it does not conform with set options
+          ## Fail if the passphrase is wrong.
+          # regenerate: "{{ 'partial_idempotence' if ssh_userCA.passphrase is defined else 'never' }}"
+          ## NOTE: don't regenerate key if it exists but does not conform with set options:
+          regenerate: >-
+            {%- set regen = ssh_keygen_key.get('regenerate', omit) | default(omit) -%}
+            {%- if regen in ['fail', 'always', 'never', 'full_idempotence', 'partial_idempotence'] -%}
+              {{- regen -}}
+            {%- else -%}
+              {{- omit -}}
+            {%- endif -%}
+          force: "{{ ssh_keygen_reissue | default(false) }}"
+        backend: cryptography
+      <<: &ssh_keygen__openssh_keypair_params
+        notify: >-
+          {%- set notify_value = ssh_keygen_notify | default(omit) -%}
+          {%- if notify_value is string and notify_value | trim != '' -%}
+            {{- notify_value -}}
+          {%- elif notify_value is iterable and notify_value | length > 0 -%}
+            {{- notify_value -}}
+          {%- else -%}
+            {{- omit -}}
+          {%- endif -%}
+        register: ssh_keygen_issued
+        loop: "{{ ssh_keygen_keys }}"
+        loop_control:
+          loop_var: ssh_keygen_key
+          label: "{{ ssh_keygen_key.path }}"
+      when: ssh_keygen_backend | default('cryptography') == 'cryptography'
+  rescue:
+    - name: "[main.yml] Rescue message"
+      ansible.builtin.debug:
+        msg: |
+          ATTENTION! The Cryptography python module was not found!
+          The fallback 'opensshbin' backend option will be used for
+          generating the SSH keypair with specified parameters.
+
+          To install the Cryptography module please follow the instructions:
+            source ~/.venvs/ansible-env/bin/activate
+            python -m pip install --upgrade pip
+            pip install cryptography
+
+    - name: "[main.yml] FALLBACK: Generate Keypair using Openssh bin"
+      community.crypto.openssh_keypair:
+        <<: *ssh_keygen__openssh_keypair
+        backend: auto
+      <<: *ssh_keygen__openssh_keypair_params
   tags: *ssh_keygen_tags

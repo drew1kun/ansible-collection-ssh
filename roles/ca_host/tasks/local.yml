@@ -1,24 +1,34 @@
 ---
+## LOCAL SSH CLIENT WORKSTATION TASKS
+
+- name: "[local.yml] LOCAL: Quick OS and user detection"
+  ansible.builtin.set_fact:
+    ssh_ca_host_local_os: "{{ lookup('pipe', 'uname -s').strip() }}"
+    ssh_ca_host_local_user: "{{ lookup('env', 'USER') or lookup('env', 'USERNAME') }}"
+  delegate_to: localhost
+  run_once: true
+
 - name: "[local.yml] LOCAL: Generate HostCA if it does not exist"
-  ## Using defaults here to make possible specifying only some of the properties
-  ## for ssh_hostCA var at the play level so that skipping the rest won't cause isses. E.g.:
-  #   ssh_hostCA:
-  #     path: /path/override
-  community.crypto.openssh_keypair:
-    path: "{{ ssh_hostCA.get('path') | string }}"
-    type: "{{ ssh_hostCA.get('type', 'ed25519') }}"
-    size: "{{ ssh_hostCA.get('size') | int(default=None) | default(omit) }}"
-    comment: "{{ ssh_hostCA.get('comment', omit) }}"
-    passphrase: "{{ ssh_hostCA.get('passphrase', omit) }}"
-    regenerate: >-
-      {{
-        'full_idempotence'
-          if (ssh_hostCA.get('regenerate', false)) is sameas(true)
-        else 'never'
-          if (ssh_hostCA.get('regenerate', false)) is sameas(false)
-        else ssh_hostCA.regenerate
-      }}
-    backend: auto
+  ansible.builtin.import_role:
+    name: ssh_keygen
+  delegate_to: localhost
+  run_once: true
+  vars:
+    # must be a list of keys (ssh_ca_host is a map), so:
+    ssh_keygen_keys:
+      - >-
+        {{
+          ssh_ca_host__ca | combine({
+            'owner': ssh_ca_host_local_user,
+            'group': ssh_ca_host_local_user if
+            'Darwin' not in ssh_ca_host_local_os else 'staff' })
+        }}
+
+- name: "[local.yml] LOCAL: stat /etc/ssh/ssh_known_hosts"
+  ansible.builtin.slurp:
+    src: /etc/ssh/ssh_known_hosts
+  register: ssh_ca_host_known_hosts_raw
+  delegate_to: localhost
   run_once: true
 
 - name: "[local.yml] LOCAL: Make sure /etc/ssh/ssh_known_hosts is aware of the trusted HostCA"
@@ -28,16 +38,32 @@
       {{
         '@cert-authority'
         ~ ' '
-        ~ (ssh_hostCA_knownhosts_domains|join(','))
+        ~ (ssh_ca_host_knownhosts_domains | join(','))
         ~ ' '
-        ~ lookup('file', ssh_hostCA.path ~ '.pub')
+        ~ lookup('file', ssh_ca_host__ca.path ~ '.pub')
       }}
     search_string: >-
       {{
         '@cert-authority'
         ~ ' '
-        ~ (ssh_hostCA_knownhosts_domains|join(','))
+        ~ (ssh_ca_host_knownhosts_domains | join(','))
       }}
     insertbefore: "BOF"
     create: true
-  become: true
+    mode: '0644'
+  delegate_to: localhost
+  run_once: true
+  # For some reason setting `become: true` fails on my MacOS localhost;
+  # This is probably related to how ansible_connection: local works
+  # and what ansible_become_method is used (see hosts.yml).
+  # That's why using slurp task before this task and conditional become:
+  # become: false -- when nothing needs to be done
+  # become: true -- when modification is required.
+  become: >-
+    {{
+      not (
+        (ssh_ca_host_known_hosts_raw.content | b64decode | string)
+        is search('@cert-authority '
+        ~ (ssh_ca_host_knownhosts_domains | join(',') | regex_escape ))
+      )
+    }}

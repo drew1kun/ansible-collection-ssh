@@ -1,25 +1,27 @@
 ---
 - name: "[libreelec.yml] Ensure persistent SSH config directories exist"
-  file:
+  ansible.builtin.file:
     path: "{{ ssh_common_cfg_path }}"
     state: directory
-    mode: '0700'
+    mode: '0755'
     owner: "{{ ssh_common_owner }}"
     group: "{{ ssh_common_group }}"
   notify: Reload sshd
   loop_control:
     loop_var: ssh_common_cfg_path
+    label: "{{ ssh_common_cfg_path }}"
   loop:
-    - "~/.config/system.d/sshd.service.d"
+    - "/storage/.config/system.d/sshd.service.d"
     - "{{ ssh_common_etc_dir }}"
 
 - name: "[libreelec.yml] Check if SSH daemon config files exist"
-  stat:
+  ansible.builtin.stat:
     path: "{{ ssh_common_cfg_file.path }}"
   loop: "{{ ssh_common_cfg_files }}"
+  register: ssh_common_cfg
   loop_control:
     loop_var: ssh_common_cfg_file
-  register: ssh_common_cfg
+    label: "{{ ssh_common_cfg_file.path }}"
   vars:
     ssh_common_cfg_files:
       - path: "{{ ssh_common_daemon_cfg }}"
@@ -33,29 +35,36 @@
         regenerate: true
 
 - name: "[libreelec.yml] Create missing SSH persistent config files"
-  copy:
-    dest: "{{ ssh_common_cfg_file_result.ssh_common_cfg_file.path }}"
-    src: "{{ ssh_common_cfg_file_result.ssh_common_cfg_file.src | default(omit) }}"
-    content: "{{ ssh_common_cfg_file_result.ssh_common_cfg_file.content | default(omit) }}"
+  ansible.builtin.copy:
+    dest: "{{ ssh_common_cfg_item.path }}"
+    src: "{{ ssh_common_cfg_item.src | default(omit) }}"
+    content: "{{ ssh_common_cfg_item.content | default(omit) }}"
     owner: "{{ ssh_common_owner }}"
     group: "{{ ssh_common_group }}"
     mode: '0600'
-    remote_src: "{{ ssh_common_cfg_file_result.ssh_common_cfg_file.src is defined }}"
-  ## Reducing noise by looping through the items that need regenration only:
-  # loop: "{{ ssh_common_cfg.results }}"
-  loop: >-
-    {{
-      ssh_common_cfg.results
-      | selectattr('stat.exists', 'equalto', false)
-      | union (
-        ssh_common_cfg.results
-        | selectattr('ssh_common_cfg_file.regenerate', 'defined')
-        | selectattr('ssh_common_cfg_file.regenerate', 'equalto', true)
-        ) | list
-    }}
+    remote_src: "{{ ssh_common_cfg_item.src is defined }}"
+  loop: "{{ ssh_common_cfg_to_apply }}"
   loop_control:
-    loop_var: ssh_common_cfg_file_result
+    loop_var: ssh_common_cfg_item
+    label: "{{ ssh_common_cfg_item.path }}"
+  when: ssh_common_cfg_to_apply | length > 0
   notify: Reload sshd
-  when:
-    - not ssh_common_cfg_file_result.stat.exists or
-      ssh_common_cfg_file_result.ssh_common_cfg_file.regenerate|bool
+  vars:
+    ssh_common_cfg_to_apply: >-
+      {{
+        (
+          ssh_common_cfg.results
+          | selectattr('stat.exists', 'equalto', false)
+          | map(attribute='item')
+          | list
+        )
+        +
+        (
+          ssh_common_cfg.results
+          | selectattr('item.regenerate', 'defined')
+          | selectattr('item.regenerate', 'equalto', true)
+          | selectattr('stat.exists', 'equalto', true)
+          | map(attribute='item')
+          | list
+        )
+      }}

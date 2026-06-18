@@ -1,0 +1,23 @@
+---
+# handlers file for ssh_ca_host
+
+- name: "[handlers.yml] Import remote tasks"
+  ansible.builtin.include_tasks:
+    file: getcert.yml
+    apply:
+      tags:
+        - ssh_hostCA
+        - ssh_hostCA_remote
+  listen: Output cert info
+
+- name: "[hanlders.yml] INFO: THE CERTIFICATE SERIAL NUMBER HAS CHANGED!"
+  ansible.builtin.debug:
+    msg: |
+      {{
+        'ATTENTION: NEW HOST KEY WAS ISSUED ALONG WITH THE NEW HOST CERTIFICATE.'
+        if ssh_keygen_issued.changed | default(false) else
+        'ATTENTION: NEW HOST CERTIFICATE WAS ISSUED FOR THE EXISTING HOST KEY!'
+      }}
+      SERIAL NUMBER WAS: {{ ssh_ca_host_old_cert_sn | default('N/A') }}
+      SERIAL NUMBER NOW: {{ ssh_ca_host_cert_serial }}
+  listen: Output cert info

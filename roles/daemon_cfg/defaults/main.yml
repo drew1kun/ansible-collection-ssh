@@ -2,6 +2,8 @@
 ---
 ## defaults file for daemon_cfg
 
+ssh_daemon_cfg_load_common: true
+
 ## GENERAL SSHD CONFIG:
 ## This allows to override some portions of ssh_daemon_cfg_base default var
 ## per group/host at the play level, WITHOUT keeping code duplications.
@@ -26,8 +28,9 @@ ssh_daemon_cfg_base:
 #     value: 'yes'
 #     comment: 'Allow root login for kodi group only'
 
-## if 'value' is present and empty, all matching stanzas will be commented out
-## if 'value' is not emptly, only matching strings <'stanza '>+<'value'> will be commented out
+## Disable (comment out) specified stanzas:
+##  if 'value' is present and empty, all matching stanzas will be commented out
+##  if 'value' is not emptly, only matching strings <'stanza '>+<'value'> will be commented out
 ssh_daemon_cfg_disable:
   - stanza: Include
     value: '/etc/ssh/sshd_config.d/*.conf'
@@ -58,4 +61,3 @@ ssh_daemon_cfg_users:
         value: 'no'
       - stanza: ForceCommand
         value: 'cvs server'
-

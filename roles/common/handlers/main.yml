@@ -14,12 +14,13 @@
 
     ## "systemclt reload sshd" is not enough, "systemctl restart sshd" is required,
     ## "systemd_service" module loses connection when restarting sshd, so using command:
-    - name: "Restart systemd {{ ssh_common_svc|default('sshd') }} service"
+    - name: "Restart systemd {{ ssh_common_svc | default('sshd') ~ ' service' }}"
       ansible.builtin.command: >-
         systemd-run
         --on-active=10s
-        --unit=sshd-restart-{{ 99999|random }}
-        systemctl restart {{ ssh_common_svc|default('sshd') }}
+        --unit=sshd-restart-{{ 99999 | random }}
+        systemctl restart {{ ssh_common_svc | default('sshd') }}
+      changed_when: true
       listen: Reload sshd
 
 - name: 'Reload sshd on MacOS'
@@ -34,7 +35,7 @@
 
 - name: 'Reload sshd on other Unix systems'
   ansible.builtin.service:
-    name: "{{ ssh_common_svc|default('sshd') }}"
+    name: "{{ ssh_common_svc | default('sshd') }}"
     state: reloaded
   become: true
   tags: always
@@ -50,4 +51,5 @@
   become: true
   check_mode: false
   listen: Reload sshd
-  when: ssh_common_is_pfsense|default(false)
+  changed_when: true
+  when: ssh_common_is_pfsense | default(false)

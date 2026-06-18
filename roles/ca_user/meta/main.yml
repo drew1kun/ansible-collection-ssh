@@ -1,34 +1,39 @@
 ---
 galaxy_info:
+  role_name: ssh_ca_user
   author: 
   description: |
     Cross-platform ansible role for hardening ssh daemon configuration,
     by configuring SSH User Certificate Authentication.
   license: MIT
-  min_ansible_version: 1.2
-  github_branch: master
+  min_ansible_version: '1.2'
+  github_branch: main
   platforms:
-    - name: MacOSX
-      versions:
-        - 10.12
-        - 10.13
     - name: Debian
-      versions:
-        - all
-    - name: LibreELEC
       versions:
         - all
     - name: FreeBSD
       versions:
         - all
+    - name: MacOSX
+      versions:
+        - all
   galaxy_tags:
     - ssh
     - sshd
-    - secure_shell
-
+    - secure
+    - shell
+    - user
+    - certificates
+    - certificate
+    - authority
+collections:
+  - community.crypto
 dependencies:
-  - role: common
+  - role: ssh_common
+    when: ssh_ca_user_load_common | default(true)
     tags:
       - ssh_userCA
       - ssh_userCA_remote
       - ssh_userCA_revoke
+allow_duplicates: false

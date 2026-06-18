@@ -2,20 +2,46 @@
 # defaults file for keygen
 
 ## If true, keys will be reissued even if they already exist.
+## NOTE! WHEN `True`, THIS TAKES PRECEEDENCE over ssh_keygen_keys[].regenerate!
 ssh_keygen_reissue: false
 
-## The support of passwphrase-protected CA will be added once the following feature is implemented:
+## This var is used when the role is imported and needs to notify some handler
+## example:
+#   ansible.builtin.import_role: name=drew1kun.ssh.keygen
+#   vars: ssh_keygen_notify='Reload sshd'
+# the above will notify the handler 'Reload sshd' if keypair task reports `changed`
+ssh_keygen_notify: []
+
+# The backend for module to use:
+# 'auto' - uses 'opensshbin' by default, but falls back to
+# cryptography python module when passphrase is used.
+# 'opensshbin' - does not handle comment changes properly.
+# To reduce red noisy output, set to 'auto' per host/group when configuring minimal distros
+ssh_keygen_backend: cryptography
+
+## The support of passwphrase-protected CA will be added once the following is implemented:
 ##   https://github.com/ansible-collections/community.crypto/issues/195
 ssh_keygen_keys:
   - path: /tmp/user_keys/id_ed25519-user1@domain-com
     type: ed25519   # ed25519 | rsa | rsa1 | dsa | ecdsa
     size: 256       # rsa:1024|2048|4096; dsa:1024; ecdsa:256|384|521; ed25519:256(ignored)
     comment: user1@domain.com
-    regenerate: full_idempotence  # see community.crypto.openssh_keypair docs
+    ## if no 'regenerate' key specified, this will be set to default (by using omit),
+    ## which is 'partial_idempotency' currently. See community.crypto.openssh_keypair docs
+    regenerate: full_idempotence
     # passphrase: 'use_vault'
+    #
+    ## Ownership can be specified per keypair.
+    ## When omitted, the default ownership will be used (see vars/main.yml):
+    # owner: "{{ ansible_user_id }}"
+    # group: "{{ ansible_user_id if 'Darwin' not in ansible_system else 'staff' }}"
   - path: /tmp/user_keys/id_rsa-user2@domain-com
     type: rsa
     size: 4096
     comment: user2@domain.com
     regenerate: full_idempotence
     # passphrase: 'use_vault'
+    #
+    ## OR use the system-specific root ownership from the ssh_common role:
+    # owner: "{{ ssh_common_owner }}"
+    # group: "{{ ssh_common_group }}"

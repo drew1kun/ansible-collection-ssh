@@ -18,16 +18,21 @@
     mode: '0644'
   become: true
   notify: Reload sshd
-  register: ssh_userCA_entity_copy
-  loop: "{{ ssh_userCA_crt_revoked|flatten(1) }}"
+  register: ssh_ca_user_entity_copy
+  loop: "{{ ssh_ca_user_crt_revoked }}"
+  loop_control:
+    label: "{{ item.filename }}"
 
 - name: "[revoke.yml] REMOTE: Revoke the keys/certs"
   ansible.builtin.command: >-
-    ssh-keygen -k -f {{ ssh_common_etc_dir }}/{{ ssh_userCA_krl_filename }}
-    -s {{ ssh_common_etc_dir }}/{{ ssh_userCA.path.split('/')[-1] }}.pub
-    -z {{ item.sn|string }}
-    {{ ssh_common_etc_dir }}/revoked/{{ item.filename }}
+    ssh-keygen -k -f {{ ssh_common_etc_dir }}/{{ ssh_ca_user_krl_filename }}
+    -s {{ ssh_common_etc_dir }}/{{ ssh_ca_user__ca.path.split('/')[-1] }}.pub
+    -z {{ ssh_ca_user_crt_revoked_item.sn | string }}
+    {{ ssh_common_etc_dir }}/revoked/{{ ssh_ca_user_crt_revoked_item.filename }}
   become: true
   notify: Reload sshd
-  loop: "{{ ssh_userCA_crt_revoked|flatten(1) }}"
-  changed_when: ssh_userCA_entity_copy.changed
+  loop: "{{ ssh_ca_user_crt_revoked }}"
+  loop_control:
+    loop_var: ssh_ca_user_crt_revoked_item
+    label: "{{ ssh_ca_user_crt_revoked_item.filename }}"
+  changed_when: ssh_ca_user_entity_copy.changed

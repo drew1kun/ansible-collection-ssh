@@ -1,32 +1,38 @@
 ---
 galaxy_info:
+  role_name: ssh_ca_host
   author: 
   description: |
     Cross-platform ansible role for hardening ssh daemon configuration,
     by setting up SSH Host Certificate Authentication.
   license: MIT
-  min_ansible_version: 1.2
-  github_branch: master
+  min_ansible_version: '1.2'
+  github_branch: main
   platforms:
-    - name: MacOSX
-      versions:
-        - 10.12
-        - 10.13
     - name: Debian
-      versions:
-        - all
-    - name: LibreELEC
       versions:
         - all
     - name: FreeBSD
       versions:
         - all
+    - name: MacOSX
+      versions:
+        - all
   galaxy_tags:
     - ssh
     - sshd
-    - secure_shell
+    - secure
+    - shell
+    - user
+    - certificates
+    - certificate
+    - authority
+collections:
+  - community.crypto
 dependencies:
-  - role: common
+  - role: ssh_common
+    when: ssh_ca_host_load_common | default(true)
     tags:
       - ssh_hostCA
       - ssh_hostCA_remote
+allow_duplicates: false

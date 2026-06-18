@@ -27,7 +27,8 @@
     insertafter: EOF
     create: true
     state: present
-  loop: "{{ ssh_daemon_cfg }}"
+    mode: '0644'
+  loop: "{{ ssh_daemon_cfg_config }}"
   register: ssh_daemon_cfg_stanza_check
   notify: Reload sshd
   become: true
@@ -66,14 +67,19 @@
         | ternary((item.value | default(''))
         | regex_escape, '.+')) }] }}"
   loop: "{{ ssh_daemon_cfg_disable | default([]) }}"
+  loop_control:
+    label: "{{ item.stanza }} - regex created"
   when: ssh_daemon_cfg_disable | default([]) | length > 0
 
 - name: "[general.yml] Comment out sshd_config stanzas if defined"
   ansible.builtin.replace:
     path: "{{ ssh_common_daemon_cfg }}"
-    regexp: "{{ item.regexp }}"
+    regexp: "{{ ssh_daemon_cfg_disable_stanza.regexp }}"
     replace: '#\g<0>'
   loop: "{{ ssh_daemon_cfg_disable_regexes }}"
+  loop_control:
+    loop_var: ssh_daemon_cfg_disable_stanza
+    label: "{{ ssh_daemon_cfg_disable_stanza.regexp }}"
   when: ssh_daemon_cfg_disable_regexes | default([]) | length > 0
   notify: Reload sshd
   become: true

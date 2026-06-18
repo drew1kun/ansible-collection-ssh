@@ -1,0 +1,20 @@
+---
+# handlers file for ssh_ca_user
+
+- name: "[main] LOCAL: Get newly issued User Certs' details"
+  ansible.builtin.command: "ssh-keygen -L -f {{ item }}"
+  register: ssh_ca_user_cert_details
+  loop: >-
+    {{ lookup('fileglob', ssh_ca_user_keys_path + '/*-cert.pub').split(',') | flatten(1) }}
+  changed_when: false
+
+- name: "[local.yml] PLEASE CHECK IF PRINCIPALS AND SN OF ISSUED CERTS ARE CORRECT"
+  vars:
+    ssh_ca_user_check_certs: >-
+      {{
+        ssh_ca_user_cert_details.results
+        |map(attribute='stdout')
+        |flatten
+      }}
+  ansible.builtin.debug:
+    msg: "{{ ssh_ca_user_check_certs }}"

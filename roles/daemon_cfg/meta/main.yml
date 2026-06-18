@@ -1,32 +1,33 @@
 # SPDX-License-Identifier: MIT-0
 ---
 galaxy_info:
-  author: your name
+  role_name: ssh_daemon_cfg
+  author: 
   description: |
     Cross-platform ansible role for ssh daemon configration.
-  company: your company (optional)
   license: MIT
-  min_ansible_version: 2.1
+  github_branch: main
+  min_ansible_version: '2.1'
   platforms:
-    - name: MacOSX
-      versions:
-        - 10.12
-        - 10.13
     - name: Debian
-      versions:
-        - all
-    - name: LibreELEC
       versions:
         - all
     - name: FreeBSD
       versions:
         - all
+    - name: MacOSX
+      versions:
+        - all
   galaxy_tags:
     - ssh
     - sshd
-    - secure_shell
+    - secure
+    - shell
+    - daemon
+    - config
 dependencies:
-  - role: common
+  - role: ssh_common
+    when: ssh_daemon_cfg_load_common | default(true)
     tags:
       - ssh_daemon_cfg
       - ssh_daemon_cfg_general
