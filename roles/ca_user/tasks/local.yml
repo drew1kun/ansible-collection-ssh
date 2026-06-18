@@ -1,78 +1,69 @@
 ---
 ## LOCAL SSH CLIENT WORKSTATION TASKS
 
-## the 'regenerate: never' marks the task 'changed' when used with passphrase, thus:
-- name: "[local.yml] LOCAL: Check if UserCA key exists"
-  ansible.builtin.stat:
-    path: "{{ ssh_userCA.path | string }}"
-  register: ssh_userCA_privkey_file
+- name: "[local.yml] LOCAL: Quick OS and user detection"
+  ansible.builtin.set_fact:
+    ssh_ca_user_local_os: "{{ lookup('pipe', 'uname -s').strip() }}"
+    ssh_ca_user_local_user: "{{ lookup('env', 'USER') or lookup('env', 'USERNAME') }}"
+  delegate_to: localhost
+  run_once: true
 
 - name: "[local.yml] LOCAL: Generate UserCA if it does not exist"
-  ## Using defaults here to make possible specifying only some of the properties
-  ## for ssh_userCA var at the play level so that skipping the rest won't cause isses. E.g.:
-  ##   ssh_userCA:
-  ##     path: /path/override
-  community.crypto.openssh_keypair:
-    path: "{{ ssh_userCA.get('path')|string }}"
-    type: "{{ ssh_userCA.get('type', omit) }}"
-    size: "{{ ssh_userCA.get('size') | int(default=None) | default(omit) }}"
-    comment: "{{ ssh_userCA.get('comment', omit) }}"
-    passphrase: "{{ ssh_userCA_key.passphrase|default(omit) }}"
-    ## NOTE: regenerate key if it does not conform with set options
-    ## Fail if the passphrase is wrong.
-    # regenerate:     "{{ 'partial_idempotence' if ssh_userCA.passphrase is defined else 'never' }}"
-    ## NOTE: don't regenerate key if it exists but does not conform with set options:
-    regenerate: >-
-      {{
-        'full_idempotence'
-          if (ssh_userCA.get('regenerate', false)) is sameas(true)
-        else 'never'
-          if (ssh_userCA.get('regenerate', false)) is sameas(false)
-        else ssh_userCA.regenerate
-      }}
-    backend: auto  # falls back to cryptography python module because passphrase is used.
-  when: not ssh_userCA_privkey_file.stat.exists
+  ansible.builtin.import_role:
+    name: ssh_keygen
+  delegate_to: localhost
+  run_once: true
+  vars:
+    # must be a list of keys (ssh_ca_user__ca is a map), so:
+    ssh_keygen_keys:
+      - >-
+        {{
+          ssh_ca_user__ca | combine({
+            'owner': ssh_ca_user_local_user,
+            'group': ssh_ca_user_local_user if
+            'Darwin' not in ssh_ca_user_local_os else 'staff' })
+        }}
 
 - name: "[local.yml] LOCAL: Issue User Certificates"
   community.crypto.openssh_cert:
     type: user
-    valid_from: "{{ ssh_userCA_cert.get('valid_from', 'always')|string }}"
-    valid_to: "{{ ssh_hostCA_cert.get('valid_to', 'forever')|string }}"
-    signing_key: "{{ ssh_userCA.get('path')|string }}"
+    valid_from: "{{ ssh_ca_user_cert.get('valid_from', 'always') | string }}"
+    valid_to: "{{ ssh_ca_user_cert.get('valid_to', 'forever') | string }}"
+    signing_key: "{{ ssh_ca_user__ca.get('path') | string }}"
     public_key: "{{ item.1 }}"
     path: "{{ item.1 | regex_replace('\\.pub$', '') }}-cert.pub"
-    serial_number: "{{ item.0.sn|int }}"
-    principals: "{{ item.0.principal.split(',')|list }}"
-    identifier: "{{ item.0.id|string }}"
-  register: ssh_userCA_certs_issued
+    serial_number: "{{ item.0.sn | int }}"
+    principals: "{{ item.0.principal.split(',') | list }}"
+    identifier: "{{ item.0.id | string }}"
+  delegate_to: localhost
+  run_once: true
+  register: ssh_ca_user_certs_issued
   # with_nested:
-  #  - "{{ ssh_userCA_cert.principals }}"
-  #  - "{{ lookup('fileglob', ssh_userCA_keys_path+'/*.pub', wantlist=True) }}"
+  #  - "{{ ssh_ca_user_cert.principals }}"
+  #  - "{{ lookup('fileglob', ssh_ca_user_keys_path+'/*.pub', wantlist=True) }}"
   loop: >-
     {{
-      ssh_userCA_cert.principals
-      | product(lookup('fileglob', ssh_userCA_keys_path+'/*.pub', wantlist=True))
+      ssh_ca_user_cert.principals
+      | product(lookup('fileglob', ssh_ca_user_keys_path+'/*.pub', wantlist=True))
       | list
     }}
+  loop_control:
+    label: "{{ item.1 }}"
   when:
     - "item.0.user in item.1"
     - "'-cert.pub' not in item.1"
 
-- name: "[main] LOCAL: Get newly issued User Certs' details"
-  ansible.builtin.command: "ssh-keygen -L -f {{ item }}"
-  register: ssh_userCA_cert_details
-  loop: "{{ lookup('fileglob', ssh_userCA_keys_path+'/*-cert.pub').split(',')|flatten(1) }}"
-  changed_when: false
-  when: ssh_userCA_certs_issued.changed
+- name: "[local.yml] Flush handlers so cert-related handlers run now"
+  ansible.builtin.meta: flush_handlers
+  delegate_to: localhost
+  run_once: true
 
-- name: "[local.yml] PLEASE CHECK IF PRINCIPALS AND SN OF ISSUED CERTS ARE CORRECT"
-  vars:
-    ssh_userCA_check_certs: >-
-      {{
-        ssh_userCA_cert_details.results
-        |map(attribute='stdout')
-        |flatten
-      }}
-  debug:
-    msg: "{{ ssh_userCA_check_certs }}"
-  when: ssh_userCA_certs_issued.changed
+# - name: "[local.yml] Send locally generated SSH keypar and Certificate to remote host"
+#   ansible.builtin.copy:
+#     src: "{{ }}"
+#     dest: "{{ ssh_ca_user_cert_path_on_remote|default('~/.ssh') }}"
+#   loop: "{{ lookup('fileglob', ssh_ca_user_keys_path+'/*-cert.pub').split(',')|flatten(1) }}"
+#   when: ssh_ca_user_cert_send_2_remote | default(false)
+#   become: true
+#   delegate_to: localhost
+#   run_once: true

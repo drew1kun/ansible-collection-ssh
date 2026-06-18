@@ -1,6 +1,11 @@
 ---
-ssh_hostCA_reissue_keys: false   # Will recreate Host Keys and Certs even if they already exist
-ssh_hostCA_reissue_certs: false   # Will recreate only Host Certs
+## Load ssh_common dependency role:
+## Disable it for playbooks that need to run multiple roles with common dependency,
+## to remove duplicate executions, and include the ssh_common role on play level instead
+ssh_ca_host_load_common: true
+
+ssh_ca_host_reissue_keys: false   # Will recreate Host Keys and Certs even if they already exist
+ssh_ca_host_reissue_certs: false   # Will recreate only Host Certs
 
 ## Remove (temporarily) Passphrase (for old ansible versions and/or for convenience):
 ##   ssh-keygen -p -N "" -f ./id_ed25519-HostCA
@@ -9,7 +14,7 @@ ssh_hostCA_reissue_certs: false   # Will recreate only Host Certs
 ##
 ## The support of passwphrase-protected CA will be added once the following feature is implemented:
 ##   https://github.com/ansible-collections/community.crypto/issues/195
-ssh_hostCA:
+ssh_ca_host__ca:
   ## Temporary path to ssh Host CA keypair. Host CA will be generated if it does not exist:
   ## NOTE: When changing the type of the key, the size MUST be set accordingly!
   path: "/tmp/id_ed25519-HostCA"  # required
@@ -25,14 +30,16 @@ ssh_hostCA:
 
 ## Host Keys parameters
 ## Generated in the default host keys location depending on managed system (see vars dir):
-ssh_hostCA_key:
+ssh_ca_host_key:
   type: ed25519
   size: 256   # ignored for ed25519
   comment: "{{ inventory_hostname }} in domain.com"
+  # owner: "{{ ansible_user_id }}"
+  # group: "{{ ansible_user_id if 'Darwin' not in ansible_system else 'staff' }}"
 
 ## inventory {{ ansible_host }} var must be FQDN e.g.: srv.domain.lan
 ## Otherwise specify it per host in host_vars:
-ssh_hostCA_cert:
+ssh_ca_host_cert:
   id: "{{ inventory_hostname }}"
   valid_from: always
   valid_to: forever
@@ -42,6 +49,6 @@ ssh_hostCA_cert:
 ## The ~/.ssh/known_hosts string to make local SSH client accept all host keys signed by CA
 ## Will result in the following line in ~/.ssh/known_hosts:
 ##   @cert-authority *.domain.com,*.domain.org ssh-ed25519 <HosTCa_PuBKEy...>
-ssh_hostCA_knownhosts_domains:
+ssh_ca_host_knownhosts_domains:
   - "*.domain.com"
   - "*.domain.org"

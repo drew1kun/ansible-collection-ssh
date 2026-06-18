@@ -1,0 +1,20 @@
+---
+- name: "[info.yml] REMOTE: Get newly issued Host Certificate details"
+  ansible.builtin.command:
+    argv: ["ssh-keygen", "-L", "-f", "{{ ssh_ca_host_crt_path }}"]
+  register: ssh_ca_host_cert_info
+  changed_when: false
+
+- name: "[info.yml] REMOTE: Extract Host Certificate serial number"
+  ansible.builtin.set_fact:
+    ssh_ca_host_cert_serial: >-
+      {{
+        (
+          ssh_ca_host_cert_info.stdout
+          | regex_findall('Serial:\s*(\d+)')
+          | default([], true)
+        )
+        | first
+        | default('', true)
+        | int
+      }}

@@ -1,24 +1,30 @@
 ---
-- name: "[main.yml] Import local tasks"
-  ansible.builtin.import_tasks: local.yml
-  delegate_to: localhost
-  run_once: true
-  tags:
-    - ssh_userCA
-    - ssh_userCA_local
+- name: "[main.yml] Include local tasks"
+  ansible.builtin.include_tasks:
+    file: local.yml
+    apply:
+      tags: &ssh_ca_user_local_tags
+        - ssh_userCA
+        - ssh_userCA_local
+  vars:
+    ansible_connection: local
+  tags: *ssh_ca_user_local_tags
 
-- name: "[main.yml] Import remote tasks"
-  ansible.builtin.import_tasks: remote.yml
-  tags:
-    - ssh_userCA
-    - ssh_userCA_remote
+- name: "[main.yml] Include remote tasks"
+  ansible.builtin.include_tasks:
+    file: remote.yml
+    apply:
+      tags: &ssh_ca_user_remote_tags
+        - ssh_userCA
+        - ssh_userCA_remote
+  tags: *ssh_ca_user_remote_tags
 
 - name: "[main.yml] Import tasks: revoke"
   ansible.builtin.include_tasks:
     file: revoke.yml
     apply:
-      tags:
+      tags: &ssh_ca_user_revoke_tags
         - ssh_userCA
         - ssh_userCA_revoke
-  when: (ssh_userCA_crt_revoked | default([])) | length > 0
-  tags: always
+  when: (ssh_ca_user_crt_revoked | default([])) | length > 0
+  tags: *ssh_ca_user_revoke_tags

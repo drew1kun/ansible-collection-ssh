@@ -1,20 +1,29 @@
 ---
-- name: "[main.yml] Import local tasks"
-  ansible.builtin.import_tasks: local.yml
-  delegate_to: localhost
-  # run_once: true
-  tags:
-    - ssh_hostCA
-    - ssh_hostCA_local
+- name: "[main.yml] Include local tasks"
+  ansible.builtin.include_tasks:
+    file: local.yml
+    apply:
+      tags: &ssh_ca_host_local_tags
+        - ssh_hostCA
+        - ssh_hostCA_local
+  vars:
+    ansible_connection: local
+  tags: *ssh_ca_host_local_tags
 
-- name: "[main.yml] Import remote tasks"
-  ansible.builtin.import_tasks: remote.yml
-  tags:
-    - ssh_hostCA
-    - ssh_hostCA_remote
+- name: "[main.yml] Include remote tasks"
+  ansible.builtin.include_tasks:
+    file: remote.yml
+    apply:
+      tags: &ssh_ca_host_remote_tags
+        - ssh_hostCA
+        - ssh_hostCA_remote
+  tags: *ssh_ca_host_remote_tags
 
-- name: "[info.yml] Import remote reporting tasks"
-  ansible.builtin.import_tasks: info.yml
-  tags:
-    - ssh_hostCA
-    - ssh_hostCA_remote
+- name: "[main.yml] Flush handlers so cert-related handlers run now"
+  ansible.builtin.meta: flush_handlers
+  tags: *ssh_ca_host_remote_tags
+
+- name: "[main.yml] INFO: PLEASE MAKE SURE THE PRINCIPALS OF ISSUED CERT ARE CORRECT"
+  ansible.builtin.debug:
+    msg: "{{ ssh_ca_host_cert_info.stdout }}"
+  tags: *ssh_ca_host_remote_tags

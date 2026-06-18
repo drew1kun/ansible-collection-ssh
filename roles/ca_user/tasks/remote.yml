@@ -3,7 +3,7 @@
 
 - name: "[remote.yml] REMOTE: Ensure UserCA Public Key exists on Managed Host"
   ansible.builtin.copy:
-    src: "{{ ssh_userCA.path }}.pub"
+    src: "{{ ssh_ca_user__ca.path }}.pub"
     dest: "{{ ssh_common_etc_dir }}"
     owner: "{{ ssh_common_owner }}"
     group: "{{ ssh_common_group }}"
@@ -15,7 +15,7 @@
 ## Without this file the sshd will reject the valid keys, so keping it here
 - name: "[remote.yml] REMOTE: Ensure RevokedKeys file exists on Managed Host"
   ansible.builtin.copy:
-    dest: "{{ ssh_common_etc_dir }}/{{ ssh_userCA_krl_filename }}"
+    dest: "{{ ssh_common_etc_dir }}/{{ ssh_ca_user_krl_filename }}"
     content: ""
     force: false
     owner: "{{ ssh_common_owner }}"
@@ -26,7 +26,7 @@
 
 - name: "[remote.yml] REMOTE: Ensure AuthorizedPrincipals dir exists on Managed Host"
   ansible.builtin.file:
-    path: "{{ ssh_common_etc_dir }}/{{ ssh_userCA_principals_dir_name }}"
+    path: "{{ ssh_common_etc_dir }}/{{ ssh_ca_user_principals_dir_name }}"
     state: directory
     mode: '0755'
     owner: "{{ ssh_common_owner }}"
@@ -37,15 +37,16 @@
 - name: "[remote.yml] REMOTE: Ensure AuthorizedPrincipals files exist"
   ansible.builtin.copy:
     dest: >-
-      {{ ssh_common_etc_dir }}/{{ ssh_userCA_principals_dir_name }}/{{ ssh_userCA_prncpl.user }}
-    content: "{{ ssh_userCA_prncpl.user }}"
+      {{ ssh_common_etc_dir }}/{{ ssh_ca_user_principals_dir_name }}/{{ ssh_ca_user_prncpl.user }}
+    content: "{{ ssh_ca_user_prncpl.user }}"
     force: false
     mode: '0644'
     owner: "{{ ssh_common_owner }}"
     group: "{{ ssh_common_group }}"
-  loop: "{{ ssh_userCA_cert.principals + [ { 'user': 'root' } ] }}"
+  loop: "{{ ssh_ca_user_cert.principals + [{'user': 'root'}] }}"
   loop_control:
-    loop_var: ssh_userCA_prncpl
+    loop_var: ssh_ca_user_prncpl
+    label: "{{ ssh_ca_user_prncpl.user }}"
   become: true
   notify: Reload sshd
 
@@ -57,9 +58,9 @@
 - name: "[remote.yml] REMOTE: Make sure sshd knows about UserCA"
   ansible.builtin.lineinfile:
     path: "{{ ssh_common_daemon_cfg }}"
-    regexp: "{{ item.regexp }}"
-    line: "{{ item.line }}"
-    insertafter: "{{ item.after }}"
+    regexp: "{{ ssh_ca_user_stanza.regexp }}"
+    line: "{{ ssh_ca_user_stanza.line }}"
+    insertafter: "{{ ssh_ca_user_stanza.after }}"
     firstmatch: false
   become: true
   notify: Reload sshd
@@ -68,14 +69,17 @@
       after: '^[\s]*#?[\s]*AuthorizedKeysFile[\s]+.*$'
       line: >-
         AuthorizedPrincipalsFile
-        {{ ssh_common_etc_dir }}/{{ ssh_userCA_principals_dir_name }}/%u
+        {{ ssh_common_etc_dir }}/{{ ssh_ca_user_principals_dir_name }}/%u
     - regexp: '^[\s]*#?[\s]*TrustedUserCAKeys[\s]+.*$'
       after: '^[\s]*#?[\s]*AuthorizedPrincipalsFile[\s]+.*$'
       line: >-
         TrustedUserCAKeys
-        {{ ssh_common_etc_dir }}/{{ ssh_userCA.path|basename }}.pub
+        {{ ssh_common_etc_dir }}/{{ ssh_ca_user__ca.path | basename }}.pub
     - regexp: '^[\s]*#?[\s]*RevokedKeys[\s]+.*$'
       after: '^[\s]*#?[\s]*TrustedUserCAKeys[\s]+.*$'
       line: >-
         RevokedKeys
-        {{ ssh_common_etc_dir }}/{{ ssh_userCA_krl_filename }}
+        {{ ssh_common_etc_dir }}/{{ ssh_ca_user_krl_filename }}
+  loop_control:
+    loop_var: ssh_ca_user_stanza
+    label: "{{ ssh_ca_user_stanza.line }} - configured"

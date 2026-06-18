@@ -1,21 +1,34 @@
 ---
 galaxy_info:
+  role_name: ssh_keygen
   author: 
   description: |
     Cross-platform ansible role for generating user SSH keys.
   license: MIT
-  min_ansible_version: 1.2
-  github_branch: master
+  min_ansible_version: '1.2'
+  github_branch: main
   platforms:
     - name: Debian
       versions:
         - all
+    - name: FreeBSD
+      versions:
+        - all
     - name: MacOSX
       versions:
-        - 10.12
-        - 10.13
+        - all
   galaxy_tags:
     - ssh
     - sshd
-    - secure_shell
-dependencies: []
+    - secure
+    - shell
+# This role is being imported in ca_user and ca_host
+# multiple times, thus we need to allow multiple runs:
+allow_duplicates: true
+collections:
+  - community.crypto
+dependencies:
+  # re-using propper key ownership from common role:
+  - role: ssh_common
+    tags:
+      - ssh_keygen

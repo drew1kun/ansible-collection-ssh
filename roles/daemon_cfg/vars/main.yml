@@ -2,7 +2,7 @@
 ---
 # vars file for daemon_cfg
 
-ssh_daemon_cfg: >-
+ssh_daemon_cfg_config: >-
   {{
     (
       ssh_daemon_cfg_base
